@@ -1,0 +1,477 @@
+// SelebrityAboki Fruit Database Schema
+// Enterprise-grade structure with security in mind
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS - Strict control over allowed values
+// ============================================
+
+enum Role {
+  USER
+  ADMIN
+  SUPERADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum ContentType {
+  RIDDLE
+  HEALTH_TIP
+  FRUIT_FACT
+  DAILY_TIP
+  QUESTION
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum DeliveryZone {
+  ZONE_1_FREE    // Ogidi, Oja Oba, Okolowo — 100% delivery free
+  ZONE_2_HALF    // Farther areas — 50% off delivery
+  ZONE_3_FULL    // No discount
+}
+
+enum ReferralStatus {
+  PENDING        // Referred user signed up but hasn't purchased
+  COMPLETED      // Referred user made a purchase
+  REWARDED       // Referrer received their discount
+}
+
+enum PromotionType {
+  FLASH_SALE
+  RAMADAN_DELIVERY
+  REFERRAL
+}
+
+// ============================================
+// USER MODEL - Authentication & Authorization
+// ============================================
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  name          String?
+  phone         String?
+  avatar        String?
+  
+  // Auth
+  googleId      String?   @unique
+  password      String?   // Argon2 hash (for non-OAuth users)
+  role          Role      @default(USER)
+  
+  // Referral system
+  referralCode  String?   @unique  // Auto-generated 8-char alphanumeric
+  
+  // Security
+  isActive      Boolean   @default(true)
+  isVerified    Boolean   @default(false)
+  lastLoginAt   DateTime?
+  lastLoginIp   String?
+  
+  // Relations
+  orders           Order[]
+  aiChats          AiChatHistory[]
+  referralsMade    Referral[] @relation("Referrer")
+  referredBy       Referral?  @relation("Referred")
+  
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([email])
+  @@index([googleId])
+  @@index([referralCode])
+  @@map("users")
+}
+
+// ============================================
+// PRODUCT MODEL - Fruit Inventory
+// ============================================
+
+model Product {
+  id            String      @id @default(cuid())
+  name          String
+  slug          String      @unique
+  description   String      @db.Text
+  
+  // Pricing (Decimal for money - NEVER use Float)
+  price         Decimal     @db.Decimal(10, 2)
+  discountPrice Decimal?    @db.Decimal(10, 2)
+  
+  // Stock
+  stock         Int         @default(0)
+  unit          String      @default("piece") // piece, kg, bunch
+  minOrder      Int         @default(1)
+  
+  // Media (Cloudinary URLs - compressed to 50kb)
+  imageUrl      String
+  images        String[]    @default([])
+  
+  // Categorization
+  category      String      @default("fruits")
+  tags          String[]    @default([])
+  
+  // Health info for AI
+  healthBenefits String?    @db.Text
+  bestFor       String[]    @default([]) // e.g., ["diabetes", "weight-loss"]
+  
+  // Status
+  isAvailable   Boolean     @default(true)
+  isFeatured    Boolean     @default(false)
+  
+  // Relations
+  orderItems    OrderItem[]
+  flashSales    FlashSale[]
+  
+  // Timestamps
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([slug])
+  @@index([category])
+  @@index([isAvailable])
+  @@map("products")
+}
+
+// ============================================
+// ORDER MODEL - With Crypto-Secure IDs
+// ============================================
+
+model Order {
+  // Crypto-secure ID: SELE-XXXX-XXXX (NOT auto-generated)
+  id              String        @id
+  
+  // Customer
+  userId          String?
+  user            User?         @relation(fields: [userId], references: [id])
+  
+  // Snapshot of customer details
+  customerName    String
+  customerEmail   String
+  customerPhone   String
+  deliveryAddress String        @db.Text
+  
+  // Order details
+  totalAmount     Decimal       @db.Decimal(10, 2)
+  status          OrderStatus   @default(PENDING)
+  notes           String?       @db.Text
+  
+  // Promotional fields
+  discountAmount  Decimal       @default(0) @db.Decimal(10, 2)
+  deliveryDiscount Decimal      @default(0) @db.Decimal(10, 2)
+  deliveryZone    DeliveryZone  @default(ZONE_3_FULL)
+  referralCode    String?       // Referral code used, if any
+  promoId         String?       // Promotion applied, if any
+  
+  // Payment
+  paymentRef      String?       @unique
+  paymentStatus   PaymentStatus @default(PENDING)
+  paymentMethod   String?
+  paidAt          DateTime?
+  
+  // Delivery
+  deliveryFee     Decimal       @default(0) @db.Decimal(10, 2)
+  estimatedDelivery DateTime?
+  deliveredAt     DateTime?
+  
+  // Relations
+  items           OrderItem[]
+  referrals       Referral[]    // Orders that completed a referral
+  
+  // Timestamps
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([customerPhone])
+  @@index([customerEmail])
+  @@index([status])
+  @@index([paymentStatus])
+  @@map("orders")
+}
+
+// ============================================
+// ORDER ITEM - Links Products to Orders
+// ============================================
+
+model OrderItem {
+  id          String    @id @default(cuid())
+  
+  orderId     String
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  
+  quantity    Int
+  priceAtTime Decimal   @db.Decimal(10, 2) // Snapshot price
+  
+  @@map("order_items")
+}
+
+// ============================================
+// AI CONTENT - Auto-generated riddles, tips
+// ============================================
+
+model DailyContent {
+  id            String      @id @default(uuid())
+  type          ContentType
+  
+  // Content (JSON for flexibility)
+  // Riddles: { question, answer, hint }
+  // Tips: { title, content, source }
+  content       Json
+  
+  // Metadata
+  isPublished   Boolean     @default(true)
+  publishedAt   DateTime    @default(now())
+  expiresAt     DateTime?
+  
+  // AI tracking
+  generatedBy   String      @default("groq-llama3")
+  promptUsed    String?     @db.Text
+  
+  // Engagement
+  views         Int         @default(0)
+  likes         Int         @default(0)
+  
+  @@index([type, publishedAt])
+  @@index([isPublished])
+  @@map("daily_content")
+}
+
+// ============================================
+// AI CHAT HISTORY - For personalization
+// ============================================
+
+model AiChatHistory {
+  id          String    @id @default(uuid())
+  
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  userMessage String    @db.Text
+  aiResponse  String    @db.Text
+  
+  // Context
+  condition   String?   // e.g., "diabetes", "weight-loss"
+  
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@map("ai_chat_history")
+}
+
+// ============================================
+// CONTACT SUBMISSIONS - With anti-spam
+// ============================================
+
+model ContactSubmission {
+  id          String    @id @default(uuid())
+  
+  name        String
+  email       String
+  phone       String?
+  message     String    @db.Text
+  
+  // Security
+  ipAddress   String
+  userAgent   String?
+  
+  // Status
+  isRead      Boolean   @default(false)
+  isSpam      Boolean   @default(false)
+  repliedAt   DateTime?
+  
+  createdAt   DateTime  @default(now())
+
+  @@index([isRead])
+  @@map("contact_submissions")
+}
+
+// ============================================
+// AUDIT LOG - Track all admin actions
+// ============================================
+
+model AuditLog {
+  id          String    @id @default(uuid())
+  
+  userId      String
+  userEmail   String
+  action      String    // e.g., "ORDER_STATUS_UPDATED"
+  resource    String    // e.g., "orders"
+  resourceId  String?
+  
+  // Details
+  oldValue    Json?
+  newValue    Json?
+  
+  // Security
+  ipAddress   String
+  userAgent   String?
+  
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================
+// RATE LIMIT TRACKING - Per-user limits
+// ============================================
+
+model RateLimitRecord {
+  id          String    @id @default(uuid())
+  
+  identifier  String    // IP or userId
+  endpoint    String    // e.g., "/api/ai/chat"
+  
+  requestCount Int      @default(1)
+  windowStart DateTime  @default(now())
+  
+  @@unique([identifier, endpoint])
+  @@index([windowStart])
+  @@map("rate_limit_records")
+}
+
+// ============================================
+// SESSION - For refresh token management
+// ============================================
+
+model Session {
+  id            String    @id @default(uuid())
+  
+  userId        String
+  refreshToken  String    @unique
+  
+  // Security
+  ipAddress     String
+  userAgent     String?
+  isValid       Boolean   @default(true)
+  
+  expiresAt     DateTime
+  createdAt     DateTime  @default(now())
+
+  @@index([userId])
+  @@index([refreshToken])
+  @@map("sessions")
+}
+
+// ============================================
+// REFERRAL SYSTEM
+// ============================================
+
+model Referral {
+  id              String          @id @default(uuid())
+  
+  referrerId      String
+  referrer        User            @relation("Referrer", fields: [referrerId], references: [id])
+  
+  referredUserId  String          @unique  // Each user can only be referred once
+  referredUser    User            @relation("Referred", fields: [referredUserId], references: [id])
+  
+  // Tracking
+  status          ReferralStatus  @default(PENDING)
+  completedOrderId String?        // The order that completed the referral
+  completedOrder  Order?          @relation(fields: [completedOrderId], references: [id])
+  
+  // Reward tracking
+  rewardedAt      DateTime?
+  discountPercent Int             @default(15)  // 15% discount
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([referrerId])
+  @@index([status])
+  @@map("referrals")
+}
+
+// ============================================
+// PROMOTIONS ENGINE
+// ============================================
+
+model Promotion {
+  id              String          @id @default(uuid())
+  
+  type            PromotionType
+  title           String
+  description     String?         @db.Text
+  
+  // Discount config (server-enforced)
+  discountPercent Int             @default(0)
+  minOrderAmount  Decimal         @default(0) @db.Decimal(10, 2)
+  maxDiscount     Decimal?        @db.Decimal(10, 2)
+  
+  // Time-bounded
+  startDate       DateTime
+  endDate         DateTime
+  
+  // Admin control
+  isActive        Boolean         @default(true)
+  createdBy       String?         // Admin who created it
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([type, isActive])
+  @@index([startDate, endDate])
+  @@map("promotions")
+}
+
+// ============================================
+// FLASH SALES - Admin-controlled time-limited deals
+// ============================================
+
+model FlashSale {
+  id              String    @id @default(uuid())
+  
+  productId       String
+  product         Product   @relation(fields: [productId], references: [id])
+  
+  // Pricing (server-enforced, never from frontend)
+  salePrice       Decimal   @db.Decimal(10, 2)
+  originalPrice   Decimal   @db.Decimal(10, 2)  // Snapshot
+  
+  // Media
+  imageUrl        String?   // Optional separate image for Ramadan promo
+  bannerText      String?   // e.g. "Ramadan Special!"
+  
+  // Schedule
+  startTime       DateTime
+  endTime         DateTime
+  
+  // Admin control
+  isActive        Boolean   @default(true)
+  createdBy       String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([productId])
+  @@index([startTime, endTime])
+  @@index([isActive])
+  @@map("flash_sales")
+}
