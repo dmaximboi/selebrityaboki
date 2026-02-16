@@ -33,8 +33,8 @@ export class AuthService {
         });
 
         if (!user) {
-            // Check if this is a secondary admin email
-            const adminEmails = this.config.get<string>('ADMIN_EMAILS')?.split(',') || [];
+            // Check if this is an admin email
+            const adminEmails = this.config.get<string>('ADMIN_EMAILS')?.split(',').map(e => e.trim()) || [];
             const role = adminEmails.includes(email) ? 'ADMIN' : 'USER';
 
             user = await this.prisma.user.create({
@@ -43,6 +43,7 @@ export class AuthService {
                     name: `${firstName} ${lastName}`,
                     avatar: picture,
                     role,
+                    referralCode: randomBytes(4).toString('hex').toUpperCase(),
                 },
             });
         }
@@ -51,8 +52,30 @@ export class AuthService {
             throw new ForbiddenException('Your account has been deactivated');
         }
 
+        return user;
+    }
+
+    /**
+     * Google OAuth login - generates tokens and creates session
+     * Called by AuthController after Google callback
+     */
+    async googleLogin(profile: any, ipAddress: string) {
+        const user = await this.validateGoogleUser(profile);
+
+        // Update last login
+        await this.prisma.user.update({
+            where: { id: user.id },
+            data: {
+                lastLoginAt: new Date(),
+                lastLoginIp: ipAddress,
+            },
+        });
+
         // Generate tokens
         const tokens = await this.generateTokens(user);
+
+        // Create session for refresh token tracking
+        await this.createSession(user.id, tokens.refreshToken, ipAddress);
 
         return {
             user,

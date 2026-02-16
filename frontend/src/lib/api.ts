@@ -123,6 +123,13 @@ export const ordersApi = {
 
     getMyOrders: () => request<any[]>('/orders/my-orders'),
     getById: (id: string) => request<any>(`/orders/${id}`),
+
+    // Initialize Flutterwave payment — returns { paymentLink, txRef }
+    initializePayment: (orderId: string) =>
+        request<{ success: boolean; paymentLink: string; txRef: string }>(
+            `/orders/${orderId}/pay`,
+            { method: 'POST' }
+        ),
 };
 
 // ============================================

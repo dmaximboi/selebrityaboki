@@ -67,8 +67,12 @@ async function bootstrap() {
             if (process.env.NODE_ENV !== 'production') {
                 return callback(null, true);
             }
+            // Allow requests with no origin (mobile apps, server-to-server, same-origin)
+            if (!origin) {
+                return callback(null, true);
+            }
             // Strict match for production
-            if (origin && allowedOrigins.includes(origin)) {
+            if (allowedOrigins.includes(origin)) {
                 return callback(null, true);
             }
             callback(new Error('CORS not allowed'));

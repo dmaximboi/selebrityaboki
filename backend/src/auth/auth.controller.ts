@@ -17,10 +17,13 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
-import { FastifyReply, FastifyRequest } from 'fastify';
 import { AuthService } from './auth.service';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+
+// Use `any` for req/res types since @fastify/cookie extends them at runtime
+type CookieRequest = any;
+type CookieReply = any;
 
 @Controller('auth')
 export class AuthController {
@@ -46,8 +49,8 @@ export class AuthController {
     @Get('google/callback')
     @UseGuards(AuthGuard('google'))
     async googleAuthCallback(
-        @Req() req: FastifyRequest,
-        @Res() res: FastifyReply
+        @Req() req: CookieRequest,
+        @Res() res: CookieReply
     ) {
         const user = req.user as any;
         const ipAddress = this.getClientIp(req);
@@ -64,14 +67,14 @@ export class AuthController {
                 maxAge: 7 * 24 * 60 * 60, // 7 days
             });
 
-            // Securely hand off the access token via a temporary cookie
-            // This prevents the token from appearing in URL logs or browser history
+            // Securely hand off the access token via a short-lived cookie
+            // Frontend reads this ONCE in /auth/callback then deletes it
             res.setCookie('auth_token_handoff', result.accessToken, {
-                httpOnly: false, // Frontend needs to read this Once
+                httpOnly: false, // Frontend needs to read this once
                 secure: this.configService.get('NODE_ENV') === 'production',
-                sameSite: 'lax',
-                path: '/',
-                maxAge: 30, // 30 seconds expiration
+                sameSite: 'strict',
+                path: '/auth/callback',
+                maxAge: 10, // 10 seconds — extremely short window
             });
 
             const frontendUrl = this.configService.get('FRONTEND_URL');
@@ -81,8 +84,9 @@ export class AuthController {
 
             return res.redirect(redirectUrl);
         } catch (error) {
+            // NEVER leak error details in URLs - use generic error code
             const frontendUrl = this.configService.get('FRONTEND_URL');
-            return res.redirect(`${frontendUrl}/auth/error?message=${error.message}`);
+            return res.redirect(`${frontendUrl}/auth/error?code=AUTH_FAILED`);
         }
     }
 
@@ -92,7 +96,7 @@ export class AuthController {
     @Public()
     @Post('refresh')
     @HttpCode(HttpStatus.OK)
-    async refreshToken(@Req() req: FastifyRequest, @Res() res: FastifyReply) {
+    async refreshToken(@Req() req: CookieRequest, @Res() res: CookieReply) {
         const refreshToken = req.cookies?.refreshToken;
 
         if (!refreshToken) {
@@ -119,7 +123,7 @@ export class AuthController {
      */
     @Post('logout')
     @HttpCode(HttpStatus.OK)
-    async logout(@Req() req: FastifyRequest, @Res() res: FastifyReply) {
+    async logout(@Req() req: CookieRequest, @Res() res: CookieReply) {
         const refreshToken = req.cookies?.refreshToken;
 
         if (refreshToken) {
@@ -137,7 +141,7 @@ export class AuthController {
     @HttpCode(HttpStatus.OK)
     async logoutAll(
         @CurrentUser('id') userId: string,
-        @Res() res: FastifyReply
+        @Res() res: CookieReply
     ) {
         await this.authService.logoutAll(userId);
 
@@ -159,7 +163,7 @@ export class AuthController {
         };
     }
 
-    private getClientIp(req: FastifyRequest): string {
+    private getClientIp(req: CookieRequest): string {
         const forwarded = req.headers['x-forwarded-for'];
         if (typeof forwarded === 'string') {
             return forwarded.split(',')[0].trim();
