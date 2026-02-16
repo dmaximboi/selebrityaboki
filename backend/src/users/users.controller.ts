@@ -5,6 +5,8 @@ import {
     Body,
     Param,
     UseGuards,
+    HttpCode,
+    HttpStatus,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -83,7 +85,7 @@ export class UsersController {
         @Param('id') id: string,
         @Body() dto: UpdateRoleDto
     ) {
-        return this.usersService.setUserRole(id, dto.role);
+        return this.usersService.setUserRole(id, dto.role as any);
     }
 
     /**

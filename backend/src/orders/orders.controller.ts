@@ -129,13 +129,13 @@ export class OrdersController {
         // Redact PII for public/unauthorized view
         return {
             id: order.id,
-            total: order.total,
+            total: order.totalAmount,
             status: order.status,
             createdAt: order.createdAt,
             items: order.items.map((item: any) => ({
                 id: item.id,
                 name: item.productName || item.product?.name,
-                price: item.price,
+                price: item.priceAtTime,
                 quantity: item.quantity,
             })),
             isRedacted: true,
@@ -169,6 +169,6 @@ export class OrdersController {
         @Param('id') id: string,
         @Body() dto: UpdateStatusDto
     ) {
-        return this.ordersService.updateOrderStatus(id, dto.status);
+        return this.ordersService.updateOrderStatus(id, dto.status as any);
     }
 }
