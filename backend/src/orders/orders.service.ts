@@ -308,28 +308,131 @@ export class OrdersService {
     }
 
     /**
-     * Handle payment webhook (from Paystack/Flutterwave)
+     * Initialize Flutterwave payment for an order
+     * Returns a payment link that the frontend redirects to
      */
-    async handlePaymentSuccess(paymentRef: string, amount: number) {
-        // Find order by payment reference
-        const order = await this.prisma.order.findFirst({
-            where: { paymentRef },
+    async initializePayment(orderId: string) {
+        const order = await this.prisma.order.findUnique({
+            where: { id: orderId },
+            include: { items: { include: { product: true } } },
         });
 
         if (!order) {
-            this.logger.warn(`Payment received for unknown order: ${paymentRef}`);
+            throw new NotFoundException('Order not found');
+        }
+
+        if (order.paymentStatus === 'SUCCESS') {
+            throw new BadRequestException('Order already paid');
+        }
+
+        const txRef = `SELA-PAY-${orderId}-${Date.now()}`;
+        const frontendUrl = this.config.get('FRONTEND_URL') || 'http://localhost:3000';
+
+        // Call Flutterwave API to create payment
+        const response = await fetch('https://api.flutterwave.com/v3/payments', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${this.config.get('FLW_SECRET_KEY')}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                tx_ref: txRef,
+                amount: order.totalAmount.toNumber(),
+                currency: 'NGN',
+                redirect_url: `${frontendUrl}/order/confirm/${orderId}`,
+                customer: {
+                    email: order.customerEmail,
+                    name: order.customerName,
+                    phonenumber: order.customerPhone,
+                },
+                customizations: {
+                    title: 'SelebrityAboki Fruit',
+                    description: `Order ${orderId}`,
+                    logo: `${frontendUrl}/icons/icon-192x192.png`,
+                },
+                meta: {
+                    order_id: orderId,
+                },
+            }),
+        });
+
+        const result = await response.json();
+
+        if (result.status !== 'success') {
+            this.logger.error(`Flutterwave init failed: ${JSON.stringify(result)}`);
+            throw new BadRequestException('Payment initialization failed');
+        }
+
+        // Save payment ref to order
+        await this.prisma.order.update({
+            where: { id: orderId },
+            data: {
+                paymentRef: txRef,
+                paymentMethod: 'flutterwave',
+            },
+        });
+
+        this.logger.log(`Payment initialized for order ${orderId}: ${txRef}`);
+
+        return {
+            success: true,
+            paymentLink: result.data.link,
+            txRef,
+        };
+    }
+
+    /**
+     * Verify Flutterwave transaction server-side and confirm order
+     * Called from webhook — NEVER trust frontend
+     */
+    async verifyAndConfirmPayment(txRef: string, transactionId: number, amount: number) {
+        // 1. Find the order by tx_ref
+        const order = await this.prisma.order.findFirst({
+            where: { paymentRef: txRef },
+        });
+
+        if (!order) {
+            this.logger.warn(`Payment received for unknown tx_ref: ${txRef}`);
             return { success: false };
         }
 
-        // Verify amount matches
-        if (order.totalAmount.toNumber() !== amount) {
+        if (order.paymentStatus === 'SUCCESS') {
+            this.logger.log(`Order ${order.id} already confirmed, skipping`);
+            return { success: true, orderId: order.id };
+        }
+
+        // 2. Verify transaction with Flutterwave API (server-side verification)
+        const verifyResponse = await fetch(
+            `https://api.flutterwave.com/v3/transactions/${transactionId}/verify`,
+            {
+                headers: {
+                    Authorization: `Bearer ${this.config.get('FLW_SECRET_KEY')}`,
+                },
+            },
+        );
+
+        const verification = await verifyResponse.json();
+
+        if (
+            verification.status !== 'success' ||
+            verification.data.status !== 'successful' ||
+            verification.data.currency !== 'NGN'
+        ) {
             this.logger.warn(
-                `Payment amount mismatch for ${order.id}: expected ${order.totalAmount}, got ${amount}`
+                `Payment verification failed for ${order.id}: ${JSON.stringify(verification.data?.status)}`
             );
             return { success: false };
         }
 
-        // Update order
+        // 3. Verify amount matches
+        if (verification.data.amount < order.totalAmount.toNumber()) {
+            this.logger.warn(
+                `Amount mismatch for ${order.id}: expected ${order.totalAmount}, got ${verification.data.amount}`
+            );
+            return { success: false };
+        }
+
+        // 4. Update order as paid
         await this.prisma.order.update({
             where: { id: order.id },
             data: {
@@ -339,7 +442,7 @@ export class OrdersService {
             },
         });
 
-        this.logger.log(`Payment confirmed for order: ${order.id}`);
+        this.logger.log(`✅ Payment confirmed for order: ${order.id} | ₦${amount}`);
 
         return { success: true, orderId: order.id };
     }

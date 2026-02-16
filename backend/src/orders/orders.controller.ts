@@ -14,6 +14,7 @@ import {
     UseGuards,
     HttpCode,
     HttpStatus,
+    BadRequestException,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -139,6 +140,24 @@ export class OrdersController {
             })),
             isRedacted: true,
         };
+    }
+
+    /**
+     * Initialize payment for an order via Flutterwave
+     * Returns a payment link to redirect the user
+     */
+    @Post(':id/pay')
+    @HttpCode(HttpStatus.OK)
+    async initializePayment(
+        @Param('id') id: string,
+        @CurrentUser('id') userId: string
+    ) {
+        // Verify user owns this order
+        const order = await this.ordersService.getOrder(id);
+        if (order.userId !== userId) {
+            throw new BadRequestException('You can only pay for your own orders');
+        }
+        return this.ordersService.initializePayment(id);
     }
 
     /**

@@ -1,7 +1,7 @@
 /**
  * Payment Webhook Controller
  * 
- * Handles payment provider webhooks with cryptographic verification.
+ * Handles Flutterwave webhooks with hash verification.
  * NEVER trust the frontend payment response - only trust webhooks.
  */
 
@@ -18,12 +18,11 @@ import {
 } from '@nestjs/common';
 import { FastifyRequest } from 'fastify';
 import { ConfigService } from '@nestjs/config';
-import { createHmac } from 'crypto';
 import { OrdersService } from '../orders/orders.service';
 import { Public } from '../common/decorators/public.decorator';
 
 @Controller('webhooks')
-@Public() // Webhooks don't use JWT - they use signature verification
+@Public() // Webhooks don't use JWT - they use hash verification
 export class WebhookController {
     private readonly logger = new Logger(WebhookController.name);
 
@@ -33,51 +32,54 @@ export class WebhookController {
     ) { }
 
     /**
-     * Paystack webhook handler
-     * Verifies signature using HMAC SHA-512
+     * Flutterwave webhook handler
+     * Verifies using the secret hash configured in Flutterwave dashboard
      */
-    @Post('paystack')
+    @Post('flutterwave')
     @HttpCode(HttpStatus.OK)
-    async handlePaystackWebhook(
-        @Headers('x-paystack-signature') signature: string,
+    async handleFlutterwaveWebhook(
+        @Headers('verif-hash') verifHash: string,
         @Body() body: any,
         @Req() req: FastifyRequest
     ) {
-        // 1. VERIFY SIGNATURE (Cryptographic)
-        const secret = this.configService.get('PAYSTACK_SECRET_KEY');
-        const hash = createHmac('sha512', secret)
-            .update(JSON.stringify(body))
-            .digest('hex');
+        // 1. VERIFY HASH
+        const secretHash = this.configService.get('FLW_WEBHOOK_HASH');
 
-        if (hash !== signature) {
+        if (!verifHash || verifHash !== secretHash) {
             this.logger.warn(
-                `Invalid webhook signature from IP: ${req.ip}`
+                `Invalid Flutterwave webhook hash from IP: ${req.ip}`
             );
-            throw new UnauthorizedException('Invalid signature');
+            throw new UnauthorizedException('Invalid webhook hash');
         }
 
         // 2. PROCESS EVENT
         const event = body.event;
         const data = body.data;
 
-        this.logger.log(`Webhook received: ${event}`);
+        this.logger.log(`Flutterwave webhook: ${event} | tx_ref: ${data?.tx_ref}`);
 
         switch (event) {
-            case 'charge.success':
-                await this.ordersService.handlePaymentSuccess(
-                    data.reference,
-                    data.amount / 100 // Paystack sends amount in kobo
-                );
+            case 'charge.completed':
+                if (data.status === 'successful') {
+                    // Verify the transaction server-side before confirming
+                    await this.ordersService.verifyAndConfirmPayment(
+                        data.tx_ref,
+                        data.id, // Flutterwave transaction ID
+                        data.amount,
+                    );
+                } else {
+                    this.logger.warn(`Payment not successful: ${data.tx_ref} - status: ${data.status}`);
+                }
                 break;
 
-            case 'charge.failed':
-                this.logger.warn(`Payment failed: ${data.reference}`);
+            case 'transfer.completed':
+                this.logger.log(`Transfer completed: ${data.id}`);
                 break;
 
             default:
                 this.logger.log(`Unhandled webhook event: ${event}`);
         }
 
-        return { received: true };
+        return { status: 'success' };
     }
 }
