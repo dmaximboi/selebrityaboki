@@ -4,8 +4,10 @@ import { OrdersController } from './orders.controller';
 import { ReferralsModule } from '../referrals/referrals.module';
 import { PromotionsModule } from '../promotions/promotions.module';
 
+import { AuthModule } from '../auth/auth.module';
+
 @Module({
-    imports: [ReferralsModule, PromotionsModule],
+    imports: [AuthModule, ReferralsModule, PromotionsModule],
     controllers: [OrdersController],
     providers: [OrdersService],
     exports: [OrdersService],
