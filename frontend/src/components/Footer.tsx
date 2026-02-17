@@ -9,7 +9,7 @@ export default function Footer() {
                         <div className="footer-brand-name">SelebrityAboki Fruit</div>
                         <p className="footer-brand-desc">
                             Your trusted source for the freshest, highest-quality fruits at Iyana
-                            Technical. Delivering health and taste to your doorstep since 2024.
+                            Technical. Delivering health and taste to your doorstep.
                         </p>
                         <p style={{ marginTop: 16, fontSize: '0.85rem', color: 'rgba(245,245,240,0.6)' }}>
                             +234 803 295 8708
@@ -47,7 +47,7 @@ export default function Footer() {
                 </div>
 
                 <div className="footer-bottom">
-                    <p>2024 SelebrityAboki Fruit. All rights reserved.</p>
+                    <p>© {new Date().getFullYear()} SelebrityAboki Fruit. All rights reserved.</p>
                     <p>Built with care at Iyana Technical</p>
                 </div>
             </div>
