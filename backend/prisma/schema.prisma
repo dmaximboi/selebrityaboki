@@ -476,3 +476,30 @@ model FlashSale {
   @@index([isActive])
   @@map("flash_sales")
 }
+
+// ============================================
+// PUSH SUBSCRIPTIONS - For Web Push Notifications
+// ============================================
+
+model PushSubscription {
+  id          String    @id @default(uuid())
+
+  // The browser-generated push endpoint
+  endpoint    String    @unique
+
+  // VAPID keys from browser
+  p256dh      String
+  auth        String
+
+  // Optional: link to a user
+  userId      String?
+
+  // Device info for debugging
+  userAgent   String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}

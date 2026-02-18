@@ -27,6 +27,7 @@ import { HealthModule } from './health/health.module';
 import { WebhookModule } from './webhooks/webhook.module';
 import { ReferralsModule } from './referrals/referrals.module';
 import { PromotionsModule } from './promotions/promotions.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 // Security
 import { SecurityInterceptor } from './common/interceptors/security.interceptor';
@@ -89,6 +90,7 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
         WebhookModule,
         ReferralsModule,
         PromotionsModule,
+        NotificationsModule,
     ],
     providers: [
         // ============================================

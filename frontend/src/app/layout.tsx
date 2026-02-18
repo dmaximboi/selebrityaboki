@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import PushNotificationProvider from '@/components/PushNotificationProvider';
 
 export const metadata: Metadata = {
     title: 'SelebrityAboki Fruit | Fresh Fruits & AI Health Tips',
@@ -12,6 +13,12 @@ export const metadata: Metadata = {
         description: 'Fresh Fruits & AI Health Tips from Iyana Technical',
         type: 'website',
         locale: 'en_NG',
+        images: [{ url: '/icons/icon-512.png', width: 512, height: 512 }],
+    },
+    icons: {
+        icon: '/icons/icon-192.png',
+        apple: '/apple-touch-icon.png',
+        shortcut: '/icons/icon-192.png',
     },
 };
 
@@ -40,9 +47,11 @@ export default function RootLayout({
                     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap"
                     rel="stylesheet"
                 />
-                <link rel="apple-touch-icon" href="/icon-192.png" />
             </head>
-            <body>{children}</body>
+            <body>
+                <PushNotificationProvider />
+                {children}
+            </body>
         </html>
     );
 }
