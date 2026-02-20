@@ -48,7 +48,7 @@ export default function Footer() {
 
                 <div className="footer-bottom">
                     <p>© {new Date().getFullYear()} SelebrityAboki Fruit. All rights reserved.</p>
-                    <p>Built with care at Iyana Technical</p>
+                    <p>A demonstration of LearnovaTech</p>
                 </div>
             </div>
         </footer>

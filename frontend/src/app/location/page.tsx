@@ -14,8 +14,8 @@ export default function LocationPage() {
                         <h1 className="section-title">Our Location</h1>
                         <hr className="divider" />
                         <p className="section-subtitle" style={{ marginBottom: 40 }}>
-                            We're located at Iyana Technical, one of Ibadan's busiest spots.
-                            Come visit us for the freshest fruits in town!
+                            We're located at Iyana Technical Junction, Ogidi, Ilorin —
+                            come visit us for the freshest fruits in town!
                         </p>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48 }}>
@@ -41,9 +41,9 @@ export default function LocationPage() {
                                     </h3>
                                     <p style={{ color: 'var(--color-text-light)', lineHeight: 1.8, fontSize: '0.95rem' }}>
                                         SelebrityAboki Fruit<br />
-                                        Iyana Technical Bus Stop<br />
-                                        Along Ojoo-Mokola Road<br />
-                                        Ibadan, Oyo State<br />
+                                        Iyana Technical Junction<br />
+                                        Ogidi, Ilorin<br />
+                                        Kwara State<br />
                                         Nigeria
                                     </p>
                                 </div>
@@ -53,8 +53,8 @@ export default function LocationPage() {
                                         Landmarks
                                     </h3>
                                     <ul style={{ color: 'var(--color-text-light)', lineHeight: 2, fontSize: '0.92rem', paddingLeft: 20 }}>
-                                        <li>Opposite Iyana Technical Junction</li>
-                                        <li>Near the main bus stop</li>
+                                        <li>Iyana Technical Junction, Ogidi</li>
+                                        <li>Easily accessible from the main road</li>
                                         <li>Look for the fresh fruit display</li>
                                     </ul>
                                 </div>
@@ -64,8 +64,8 @@ export default function LocationPage() {
                                         Delivery Areas
                                     </h3>
                                     <p style={{ color: 'var(--color-text-light)', lineHeight: 1.8, fontSize: '0.92rem' }}>
-                                        We deliver across Ibadan including Ojoo, Mokola, UI, Agbowo,
-                                        Bodija, Sango, and surrounding areas. Delivery fees vary by
+                                        We deliver across Ilorin including Ogidi, Tanke, GRA,
+                                        Fate, Kulende, Offa Garage, and surrounding areas. Delivery fees vary by
                                         distance.
                                     </p>
                                 </div>

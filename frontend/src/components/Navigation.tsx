@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/auth';
 import { useCartStore } from '@/store/cart';
@@ -31,10 +32,13 @@ export default function Navigation() {
         <nav className={`nav ${scrolled ? 'nav-scrolled' : 'nav-scrolled'}`}>
             <div className="nav-inner">
                 <Link href="/" className="nav-logo">
-                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                        <circle cx="14" cy="14" r="14" fill="#1a5632" />
-                        <text x="14" y="19" textAnchor="middle" fill="white" fontSize="14" fontWeight="700" fontFamily="Outfit">S</text>
-                    </svg>
+                    <Image
+                        src="/selebrity.jpg"
+                        alt="SelebrityAboki Fruit Logo"
+                        width={32}
+                        height={32}
+                        style={{ borderRadius: '50%', objectFit: 'cover' }}
+                    />
                     SelebrityAboki Fruit
                 </Link>
 
