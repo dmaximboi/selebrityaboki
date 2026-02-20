@@ -14,6 +14,7 @@ import {
     UseGuards,
     HttpCode,
     HttpStatus,
+    Logger,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
@@ -27,6 +28,8 @@ type CookieReply = any;
 
 @Controller('auth')
 export class AuthController {
+    private readonly logger = new Logger(AuthController.name);
+
     constructor(
         private readonly authService: AuthService,
         private readonly configService: ConfigService
@@ -83,8 +86,16 @@ export class AuthController {
                 : `${frontendUrl}/auth/callback`;
 
             return res.redirect(redirectUrl);
-        } catch (error) {
-            // NEVER leak error details in URLs - use generic error code
+        } catch (error: any) {
+            // Log the FULL error so we can see it in Render logs
+            this.logger.error(
+                `Google callback failed: ${error?.message}`,
+                error?.stack,
+            );
+            this.logger.error(
+                `req.user was: ${JSON.stringify(user)}`,
+            );
+
             const frontendUrl = this.configService.get('FRONTEND_URL');
             return res.redirect(`${frontendUrl}/auth/error?code=AUTH_FAILED`);
         }
