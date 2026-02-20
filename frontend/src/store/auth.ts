@@ -67,6 +67,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     },
 
     checkAuth: async () => {
+        // Don't overwrite if login() already authenticated the user
+        if (get().isAuthenticated) {
+            set({ isLoading: false });
+            return;
+        }
+
         set({ isLoading: true });
         try {
             // Try to refresh token (using cookie)

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { adminApi } from '@/lib/api';
 
@@ -17,7 +17,8 @@ function pct(part: number, total: number) {
 
 export default function AdminPage() {
     const router = useRouter();
-    const { user, isAdmin, isLoading, checkAuth } = useAuthStore();
+    const searchParams = useSearchParams();
+    const { user, isAdmin, isLoading, login, checkAuth } = useAuthStore();
     const [activeTab, setActiveTab] = useState<Tab>('dashboard');
     const [dashData, setDashData] = useState<any>(null);
     const [analyticsData, setAnalyticsData] = useState<any>(null);
@@ -33,8 +34,26 @@ export default function AdminPage() {
     const [loading, setLoading] = useState(false);
     const [showFlashForm, setShowFlashForm] = useState(false);
     const [showPromoForm, setShowPromoForm] = useState(false);
+    const tokenHandled = useRef(false);
 
-    useEffect(() => { checkAuth(); }, [checkAuth]);
+    // Handle token from OAuth redirect OR fall back to cookie-based refresh
+    useEffect(() => {
+        if (tokenHandled.current) return;
+        tokenHandled.current = true;
+
+        const token = searchParams.get('t');
+        if (token) {
+            // Admin was redirected here with ?t=<accessToken> after Google login
+            login(decodeURIComponent(token)).then(() => {
+                // Clean the token from the URL bar
+                router.replace('/selebme');
+            });
+        } else {
+            // No token in URL — try cookie-based refresh
+            checkAuth();
+        }
+    }, [searchParams, login, checkAuth, router]);
+
     useEffect(() => {
         if (!isLoading && !isAdmin) router.push('/');
     }, [isLoading, isAdmin, router]);
