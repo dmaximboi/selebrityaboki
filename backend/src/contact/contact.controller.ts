@@ -12,7 +12,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { FastifyRequest } from 'fastify';
+import { Request } from 'express';
 import { ContactService } from './contact.service';
 import { Public } from '../common/decorators/public.decorator';
 import { AdminGuard } from '../common/guards/admin.guard';
@@ -41,7 +41,7 @@ class CreateContactDto {
 
 @Controller('contact')
 export class ContactController {
-  constructor(private readonly contactService: ContactService) {}
+  constructor(private readonly contactService: ContactService) { }
 
   /**
    * Submit contact form (public)
@@ -49,7 +49,7 @@ export class ContactController {
   @Public()
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async submit(@Body() dto: CreateContactDto, @Req() req: FastifyRequest) {
+  async submit(@Body() dto: CreateContactDto, @Req() req: Request) {
     const ipAddress =
       (req.headers['x-forwarded-for'] as string)?.split(',')[0] ||
       req.ip ||

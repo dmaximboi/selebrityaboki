@@ -1,33 +1,28 @@
 /**
- * SelebrityAboki Fruit Backend - Main Entry Point
- * 
- * Security Layers Implemented:
- * 1. Helmet - HTTP Security Headers
- * 2. CORS Whitelist - Only trusted origins
- * 3. Rate Limiting - Prevent abuse
+ * SelebrityAboki Fruit Backend - Main Entry Point (Express)
+ *
+ * Security Layers:
+ * 1. Helmet  - HTTP Security Headers
+ * 2. CORS    - Only trusted origins
+ * 3. Cookies - HTTP-only, Secure, SameSite via cookie-parser
  * 4. Validation Pipe - Input sanitization
- * 5. Cookie Security - HTTP-only, Secure, SameSite
+ * 5. Body Size Limit - 10MB
  */
 
 import { NestFactory } from '@nestjs/core';
-import {
-    FastifyAdapter,
-    NestFastifyApplication,
-} from '@nestjs/platform-fastify';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
-import fastifyCookie from '@fastify/cookie';
+import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-    // Use Fastify for ~30k req/sec performance
-    const app = await NestFactory.create<NestFastifyApplication>(
-        AppModule,
-        new FastifyAdapter({
-            logger: process.env.NODE_ENV !== 'production',
-            trustProxy: true, // For rate limiting behind proxy
-        })
-    );
+    const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+        logger: ['error', 'warn', 'log'],
+    });
+
+    // Trust Render/Vercel proxy
+    app.set('trust proxy', 1);
 
     // ============================================
     // SECURITY LAYER 1: Helmet (HTTP Headers)
@@ -45,7 +40,7 @@ async function bootstrap() {
             },
             crossOriginEmbedderPolicy: false,
             hsts: {
-                maxAge: 31536000, // 1 year
+                maxAge: 31536000,
                 includeSubDomains: true,
                 preload: true,
             },
@@ -57,21 +52,19 @@ async function bootstrap() {
     // ============================================
     const allowedOrigins = [
         process.env.FRONTEND_URL,
-        'https://selebrityaboki.com', // Proper production domain
+        'https://selebrityaboki.com',
         'https://www.selebrityaboki.com',
+        'http://localhost:3000',
     ].filter(Boolean) as string[];
 
     app.enableCors({
         origin: (origin, callback) => {
-            // Allow local dev origins
             if (process.env.NODE_ENV !== 'production') {
                 return callback(null, true);
             }
-            // Allow requests with no origin (mobile apps, server-to-server, same-origin)
             if (!origin) {
                 return callback(null, true);
             }
-            // Strict match for production
             if (allowedOrigins.includes(origin)) {
                 return callback(null, true);
             }
@@ -85,19 +78,16 @@ async function bootstrap() {
     // ============================================
     // SECURITY LAYER 3: Cookie Parser
     // ============================================
-    await app.register(fastifyCookie, {
-        secret: process.env.JWT_SECRET,
-    });
+    app.use(cookieParser(process.env.JWT_SECRET));
 
     // ============================================
     // SECURITY LAYER 4: Global Validation Pipe
-    // Strips unknown properties, validates DTOs
     // ============================================
     app.useGlobalPipes(
         new ValidationPipe({
-            whitelist: true, // Strip unknown properties
-            forbidNonWhitelisted: true, // Throw on unknown properties
-            transform: true, // Auto-transform to DTO types
+            whitelist: true,
+            forbidNonWhitelisted: true,
+            transform: true,
             transformOptions: {
                 enableImplicitConversion: true,
             },
@@ -105,18 +95,7 @@ async function bootstrap() {
         })
     );
 
-    // ============================================
-    // SECURITY LAYER 5: Request Size Limit
-    // Prevents buffer overflow attacks
-    // ============================================
-    app.getHttpAdapter().getInstance().register(require('@fastify/multipart'), {
-        limits: {
-            fileSize: 5 * 1024 * 1024, // 5MB max
-            files: 5,
-        },
-    });
-
-    // Global prefix for API routes
+    // Global prefix — health excluded
     app.setGlobalPrefix('api', {
         exclude: ['health'],
     });

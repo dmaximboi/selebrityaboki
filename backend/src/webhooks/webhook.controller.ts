@@ -16,7 +16,7 @@ import {
     HttpCode,
     HttpStatus,
 } from '@nestjs/common';
-import { FastifyRequest } from 'fastify';
+import { Request } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { OrdersService } from '../orders/orders.service';
 import { Public } from '../common/decorators/public.decorator';
@@ -40,7 +40,7 @@ export class WebhookController {
     async handleFlutterwaveWebhook(
         @Headers('verif-hash') verifHash: string,
         @Body() body: any,
-        @Req() req: FastifyRequest
+        @Req() req: Request
     ) {
         // 1. VERIFY HASH
         const secretHash = this.configService.get('FLW_WEBHOOK_HASH');
