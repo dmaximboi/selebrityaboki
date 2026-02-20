@@ -33,7 +33,7 @@ export default function Navigation() {
             <div className="nav-inner">
                 <Link href="/" className="nav-logo">
                     <Image
-                        src="/selebrity.jpg"
+                        src="/icons/selebrity.jpg"
                         alt="SelebrityAboki Fruit Logo"
                         width={32}
                         height={32}

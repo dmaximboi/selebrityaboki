@@ -5,7 +5,7 @@
  */
 
 import { create } from 'zustand';
-import { authApi, setAccessToken } from '../lib/api';
+import { authApi, setAccessToken, getAccessToken } from '../lib/api';
 
 interface User {
     id: string;
@@ -74,8 +74,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
 
         set({ isLoading: true });
+
+        // 1) First try: use saved access token from localStorage
+        const savedToken = getAccessToken();
+        if (savedToken) {
+            try {
+                const user = await authApi.getMe();
+                set({
+                    user,
+                    isAuthenticated: true,
+                    isAdmin: user.role === 'ADMIN' || user.role === 'SUPERADMIN',
+                    isLoading: false,
+                });
+                return;
+            } catch {
+                // Token expired — clear it and try cookie refresh below
+                setAccessToken(null);
+            }
+        }
+
+        // 2) Fallback: try cookie-based refresh (works on same domain)
         try {
-            // Try to refresh token (using cookie)
             const res = await fetch(
                 `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/auth/refresh`,
                 { method: 'POST', credentials: 'include' }

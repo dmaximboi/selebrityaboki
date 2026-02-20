@@ -16,14 +16,20 @@ class ApiError extends Error {
     }
 }
 
-let accessToken: string | null = null;
+const TOKEN_KEY = 'sb_access_token';
 
 export function setAccessToken(token: string | null) {
-    accessToken = token;
+    if (typeof window === 'undefined') return;
+    if (token) {
+        localStorage.setItem(TOKEN_KEY, token);
+    } else {
+        localStorage.removeItem(TOKEN_KEY);
+    }
 }
 
 export function getAccessToken(): string | null {
-    return accessToken;
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(TOKEN_KEY);
 }
 
 async function refreshToken(): Promise<string | null> {
@@ -36,8 +42,8 @@ async function refreshToken(): Promise<string | null> {
         if (!res.ok) return null;
 
         const data = await res.json();
-        accessToken = data.accessToken;
-        return accessToken;
+        setAccessToken(data.accessToken);
+        return data.accessToken;
     } catch {
         return null;
     }
@@ -54,8 +60,8 @@ async function request<T>(
         ...(options.headers as Record<string, string>),
     };
 
-    if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
+    if (getAccessToken()) {
+        headers['Authorization'] = `Bearer ${getAccessToken()}`;
     }
 
     let res = await fetch(url, {
@@ -65,7 +71,7 @@ async function request<T>(
     });
 
     // If 401, try to refresh token
-    if (res.status === 401 && accessToken) {
+    if (res.status === 401 && getAccessToken()) {
         const newToken = await refreshToken();
         if (newToken) {
             headers['Authorization'] = `Bearer ${newToken}`;
