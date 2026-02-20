@@ -2,7 +2,8 @@
  * Security Interceptor
  * 
  * Adds security headers and recursively sanitizes responses
- * to prevent PII and sensitive data leakage
+ * to prevent PII and sensitive data leakage.
+ * Handles circular references in Prisma objects safely.
  */
 
 import {
@@ -26,6 +27,8 @@ export class SecurityInterceptor implements NestInterceptor {
         'secretKey',
     ]);
 
+    private readonly MAX_DEPTH = 10;
+
     intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
         const response = context.switchToHttp().getResponse();
 
@@ -42,7 +45,7 @@ export class SecurityInterceptor implements NestInterceptor {
         return next.handle().pipe(
             map((data) => {
                 if (data && typeof data === 'object') {
-                    return this.sanitizeResponse(data);
+                    return this.sanitizeResponse(data, new WeakSet(), 0);
                 }
                 return data;
             })
@@ -50,15 +53,27 @@ export class SecurityInterceptor implements NestInterceptor {
     }
 
     /**
-     * Recursively sanitize response data, stripping sensitive fields
-     * from all levels of nesting including arrays and nested objects
+     * Recursively sanitize response data, stripping sensitive fields.
+     * Uses a WeakSet to detect circular references and a depth limit
+     * to prevent stack overflow on Prisma objects.
      */
-    private sanitizeResponse(data: any): any {
+    private sanitizeResponse(data: any, visited: WeakSet<object>, depth: number): any {
         if (!data || typeof data !== 'object') return data;
 
+        // Stop at max depth to prevent stack overflow
+        if (depth >= this.MAX_DEPTH) return undefined;
+
+        // Detect circular references
+        if (visited.has(data)) return undefined;
+        visited.add(data);
+
         if (Array.isArray(data)) {
-            return data.map((item) => this.sanitizeResponse(item));
+            return data.map((item) => this.sanitizeResponse(item, visited, depth + 1));
         }
+
+        // Handle Decimal/BigInt/Date objects — don't recurse into them
+        if (data.constructor && data.constructor.name === 'Decimal') return data;
+        if (data instanceof Date) return data;
 
         const sanitized = { ...data };
 
@@ -71,7 +86,7 @@ export class SecurityInterceptor implements NestInterceptor {
 
             // Recurse into nested objects and arrays
             if (sanitized[key] && typeof sanitized[key] === 'object') {
-                sanitized[key] = this.sanitizeResponse(sanitized[key]);
+                sanitized[key] = this.sanitizeResponse(sanitized[key], visited, depth + 1);
             }
         }
 
