@@ -8,16 +8,11 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     private readonly logger = new Logger(GoogleStrategy.name);
 
     constructor(private readonly configService: ConfigService) {
-        // Determine the callback URL based on NODE_ENV
         const backendUrl = configService.get<string>('BACKEND_URL') || 'http://localhost:4000';
         const callbackURL = `${backendUrl}/api/auth/google/callback`;
 
         const clientID = configService.get<string>('GOOGLE_CLIENT_ID');
         const clientSecret = configService.get<string>('GOOGLE_CLIENT_SECRET');
-
-        // Log at startup so we can verify correct config in Render logs
-        console.log(`[GoogleStrategy] Callback URL: ${callbackURL}`);
-        console.log(`[GoogleStrategy] Client ID ends with: ...${clientID?.slice(-6)}`);
 
         if (!clientID || !clientSecret) {
             throw new Error('Google OAuth credentials are not configured (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET)');
@@ -29,6 +24,10 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
             callbackURL,
             scope: ['email', 'profile'],
         });
+
+        // Safe startup confirmation — no sensitive values logged
+        const logger = new Logger(GoogleStrategy.name);
+        logger.log(`Google OAuth initialized. Callback: ${callbackURL}`);
     }
 
     async validate(

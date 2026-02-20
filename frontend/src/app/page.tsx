@@ -83,25 +83,25 @@ export default function HomePage() {
                             </p>
                         </div>
                         <div style={{
-                            background: 'linear-gradient(135deg, #e8f0e0, #fef3e2)',
                             borderRadius: 'var(--radius-xl)',
                             height: 400,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: '4rem',
+                            overflow: 'hidden',
                         }}>
-                            <div style={{ textAlign: 'center' }}>
-                                <div style={{ fontSize: '5rem', marginBottom: 12 }}>
-                                    <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-                                        <circle cx="40" cy="40" r="38" stroke="#1a5632" strokeWidth="3" />
-                                        <text x="40" y="52" textAnchor="middle" fill="#1a5632" fontSize="36" fontWeight="800" fontFamily="Outfit">SF</text>
-                                    </svg>
-                                </div>
-                                <p style={{ fontSize: '1rem', color: 'var(--color-primary)', fontWeight: 600 }}>
-                                    Quality Since Day One
-                                </p>
-                            </div>
+                            <img
+                                src="/icons/selebrity.jpg"
+                                alt="SelebrityAboki Fruit"
+                                style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover',
+                                    borderRadius: 'var(--radius-xl)',
+                                    boxShadow: '0 12px 40px rgba(26,86,50,0.18)',
+                                    display: 'block',
+                                }}
+                            />
                         </div>
                     </div>
                 </div>

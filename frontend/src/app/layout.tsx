@@ -2,18 +2,36 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import PushNotificationProvider from '@/components/PushNotificationProvider';
 
+const BASE_URL = 'https://selebrityaboki.vercel.app';
+
 export const metadata: Metadata = {
+    metadataBase: new URL(BASE_URL),
     title: 'SelebrityAboki Fruit | Fresh Fruits & AI Health Tips',
     description:
         'Get the freshest fruits and personalized AI-powered health recommendations from SelebrityAboki Fruit at Iyana Technical. Order online for delivery.',
     keywords: ['fruits', 'fresh fruits', 'health', 'nutrition', 'Iyana Technical', 'SelebrityAboki'],
     manifest: '/manifest.json',
     openGraph: {
-        title: 'SelebrityAboki Fruit',
-        description: 'Fresh Fruits & AI Health Tips from Iyana Technical',
+        title: 'SelebrityAboki Fruit | Fresh Fruits & AI Health Tips',
+        description: 'Get the freshest fruits and AI health tips from Iyana Technical. Order fresh fruits online.',
+        url: BASE_URL,
+        siteName: 'SelebrityAboki Fruit',
         type: 'website',
         locale: 'en_NG',
-        images: [{ url: '/icons/icon-512.png', width: 512, height: 512 }],
+        images: [
+            {
+                url: '/icons/selebrity.jpg',
+                width: 800,
+                height: 800,
+                alt: 'SelebrityAboki Fruit Logo',
+            },
+        ],
+    },
+    twitter: {
+        card: 'summary_large_image',
+        title: 'SelebrityAboki Fruit | Fresh Fruits & AI Health Tips',
+        description: 'Fresh fruits & AI-powered health recommendations from Iyana Technical.',
+        images: ['/icons/selebrity.jpg'],
     },
     icons: {
         icon: '/icons/icon-192.png',
