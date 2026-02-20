@@ -212,6 +212,8 @@ export const adminApi = {
     getActivity: () => request<any[]>('/admin/activity'),
     getContentStats: () => request<any>('/admin/content-stats'),
     getAiStats: () => request<any>('/admin/ai-stats'),
+    getAiAnalytics: () => request<any>('/admin/ai-analytics'),
+    getLoginAnalytics: () => request<any>('/admin/login-analytics'),
     generateContent: (type: string) =>
         request<any>(`/content/generate/${type}`, { method: 'POST' }),
 

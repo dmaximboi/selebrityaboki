@@ -1,17 +1,15 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { Suspense } from 'react';
 
 function CallbackContent() {
-    const searchParams = useSearchParams();
     const router = useRouter();
     const { login } = useAuthStore();
 
     useEffect(() => {
-        // Read token from the temporary cookie handoff
         const getCookie = (name: string) => {
             const value = `; ${document.cookie}`;
             const parts = value.split(`; ${name}=`);
@@ -22,14 +20,34 @@ function CallbackContent() {
         const token = getCookie('auth_token_handoff');
 
         if (token) {
-            // Clear the temporary cookie immediately
-            document.cookie = 'auth_token_handoff=; Max-Age=0; path=/;';
+            // Consume the cookie immediately
+            document.cookie = 'auth_token_handoff=; Max-Age=0; path=/auth/callback;';
 
             login(token).then(() => {
-                router.push('/');
+                // Redirect to the page they came from, or home
+                const returnTo = localStorage.getItem('auth_return_to') || '/';
+                localStorage.removeItem('auth_return_to');
+                router.replace(returnTo);
             });
         } else {
-            router.push('/');
+            // No token — cookie might be blocked (sameSite issue).
+            // Try a token refresh using the httpOnly refreshToken cookie.
+            fetch(
+                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/auth/refresh`,
+                { method: 'POST', credentials: 'include' }
+            )
+                .then(async (res) => {
+                    if (res.ok) {
+                        const data = await res.json();
+                        await login(data.accessToken);
+                        const returnTo = localStorage.getItem('auth_return_to') || '/';
+                        localStorage.removeItem('auth_return_to');
+                        router.replace(returnTo);
+                    } else {
+                        router.replace('/');
+                    }
+                })
+                .catch(() => router.replace('/'));
         }
     }, [login, router]);
 

@@ -19,6 +19,11 @@ export default function Navigation() {
     }, []);
 
     const handleLogin = () => {
+        // Save current page so we can return after sign-in
+        const returnTo = window.location.pathname + window.location.search;
+        if (returnTo !== '/' && !returnTo.startsWith('/auth')) {
+            localStorage.setItem('auth_return_to', returnTo);
+        }
         window.location.href = authApi.getGoogleAuthUrl();
     };
 

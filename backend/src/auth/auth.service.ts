@@ -115,7 +115,7 @@ export class AuthService {
         // Generate new tokens
         const tokens = await this.generateTokens(user);
 
-        // Create new session
+        // Create new session — slide the 3-day window on every refresh
         await this.createSession(user.id, tokens.refreshToken, ipAddress);
 
         return tokens;
@@ -208,8 +208,9 @@ export class AuthService {
         refreshToken: string,
         ipAddress: string
     ) {
+        // 3-day sliding window — resets on every refresh
         const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+        expiresAt.setDate(expiresAt.getDate() + 3);
 
         const hashedToken = await this.hashToken(refreshToken);
 

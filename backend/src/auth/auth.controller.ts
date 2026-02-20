@@ -63,18 +63,18 @@ export class AuthController {
             res.cookie('refreshToken', result.refreshToken, {
                 httpOnly: true,
                 secure: isProduction,
-                sameSite: 'lax',
+                sameSite: isProduction ? 'none' : 'lax',
                 path: '/',
-                maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
+                maxAge: 3 * 24 * 60 * 60 * 1000, // 3 days in ms
             });
 
-            // Short-lived handoff cookie — frontend reads it once then it expires
+            // Handoff cookie — readable by JS, short-lived, cross-site safe
             res.cookie('auth_token_handoff', result.accessToken, {
                 httpOnly: false,
                 secure: isProduction,
-                sameSite: 'strict',
-                path: '/auth/callback',
-                maxAge: 10 * 1000, // 10 seconds in ms
+                sameSite: isProduction ? 'none' : 'lax',
+                path: '/',
+                maxAge: 30 * 1000, // 30 seconds
             });
 
             const frontendUrl = this.configService.get('FRONTEND_URL');

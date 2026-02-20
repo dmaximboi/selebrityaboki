@@ -13,17 +13,11 @@ import { AdminGuard } from '../common/guards/admin.guard';
 export class AdminController {
     constructor(private readonly adminService: AdminService) { }
 
-    /**
-     * Get dashboard overview
-     */
     @Get('dashboard')
     async getDashboard() {
         return this.adminService.getDashboardStats();
     }
 
-    /**
-     * Get all orders with pagination
-     */
     @Get('orders')
     async getOrders(
         @Query('page') page?: string,
@@ -37,27 +31,30 @@ export class AdminController {
         );
     }
 
-    /**
-     * Get recent activity
-     */
     @Get('activity')
     async getActivity(@Query('limit') limit?: string) {
-        return this.adminService.getRecentActivity(limit ? parseInt(limit) : 20);
+        return this.adminService.getRecentActivity(limit ? parseInt(limit) : 50);
     }
 
-    /**
-     * Get content statistics
-     */
     @Get('content-stats')
     async getContentStats() {
         return this.adminService.getContentStats();
     }
 
-    /**
-     * Get AI usage statistics
-     */
     @Get('ai-stats')
     async getAiStats() {
         return this.adminService.getAiStats();
+    }
+
+    /** Full AI analytics — top users, per-day usage, recent chats */
+    @Get('ai-analytics')
+    async getAiAnalytics() {
+        return this.adminService.getAiAnalytics();
+    }
+
+    /** Login / sign-in analytics */
+    @Get('login-analytics')
+    async getLoginAnalytics() {
+        return this.adminService.getLoginAnalytics();
     }
 }
