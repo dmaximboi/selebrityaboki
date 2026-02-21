@@ -105,6 +105,11 @@ BUSINESS INFORMATION:
             return "I'm here to help you with fruit recommendations! What health goals can I assist with?";
         }
 
+        // 3b. Off-topic detection — save API calls for non-fruit questions
+        if (this.isOffTopic(userMessage)) {
+            return "I only answer questions about fruits, nutrition, and health benefits. I'm your dedicated SelebrityAboki Fruit advisor! Try asking me things like 'Which fruits help with diabetes?' or 'What fruits boost immunity?'";
+        }
+
         // 4. Sanitize input
         const sanitizedMessage = this.sanitizeInput(userMessage);
 
@@ -141,10 +146,9 @@ BUSINESS INFORMATION:
 
             return aiResponse;
         } catch (error) {
-            this.logger.error(`AI request failed: ${error.message}`);
-            throw new BadRequestException(
-                'Our health advisor is briefly unavailable. Please try again.'
-            );
+            this.logger.error(`AI request failed: ${error.message}`, error.stack);
+            // Return a helpful fruit-related fallback instead of a generic error
+            return "I'm having a moment — let me catch my breath! In the meantime, did you know that watermelon is 92% water and perfect for staying hydrated? Try again shortly, and I'll be ready to help you pick the best fruits at SelebrityAboki Fruit!";
         }
     }
 
@@ -194,6 +198,46 @@ BUSINESS INFORMATION:
 
     private isJailbreakAttempt(message: string): boolean {
         return this.JAILBREAK_PATTERNS.some((pattern) => pattern.test(message));
+    }
+
+    /**
+     * Detect clearly off-topic messages to save API calls.
+     * Returns true if the message is NOT about fruits, nutrition, or health.
+     */
+    private isOffTopic(message: string): boolean {
+        const lower = message.toLowerCase();
+
+        // If the message contains any fruit/food/nutrition keyword, it's on-topic
+        const fruitKeywords = [
+            'fruit', 'apple', 'banana', 'mango', 'orange', 'grape', 'melon', 'watermelon',
+            'pineapple', 'papaya', 'guava', 'pawpaw', 'coconut', 'lime', 'lemon', 'berry',
+            'strawberry', 'blueberry', 'avocado', 'cherry', 'peach', 'pear', 'plum', 'kiwi',
+            'fig', 'date', 'pomegranate', 'tangerine', 'grapefruit', 'passion', 'dragon',
+            'vitamin', 'nutrient', 'nutrition', 'diet', 'health', 'eat', 'food', 'juice',
+            'smoothie', 'salad', 'fresh', 'organic', 'weight', 'sugar', 'diabetes',
+            'blood pressure', 'immunity', 'digest', 'antioxidant', 'fiber', 'protein',
+            'mineral', 'calcium', 'iron', 'potassium', 'skin', 'hair', 'energy',
+            'pregnant', 'pregnancy', 'baby', 'child', 'elderly', 'selebrity', 'aboki',
+            'order', 'buy', 'price', 'delivery', 'stock', 'available', 'recommend',
+        ];
+
+        if (fruitKeywords.some(kw => lower.includes(kw))) {
+            return false; // On-topic
+        }
+
+        // If none of the fruit keywords match, check for clearly off-topic patterns
+        const offTopicPatterns = [
+            /\b(code|program|javascript|python|html|css|sql|api)\b/i,
+            /\b(politics|election|president|government|war|military)\b/i,
+            /\b(bitcoin|crypto|stock market|forex|trading)\b/i,
+            /\b(movie|film|music|song|album|artist|celebrity)\b/i,
+            /\b(football|soccer|basketball|cricket|nba|epl)\b/i,
+            /\b(math|calcul|equation|algebra|geometry)\b/i,
+            /\b(write me|generate|create a|make a|build)\b/i,
+            /\b(religion|church|mosque|god|allah|jesus)\b/i,
+        ];
+
+        return offTopicPatterns.some(pattern => pattern.test(message));
     }
 
     private sanitizeInput(message: string): string {

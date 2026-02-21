@@ -3,9 +3,16 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
-import { adminApi } from '@/lib/api';
+import { adminApi, productsApi } from '@/lib/api';
 
 type Tab = 'dashboard' | 'analytics' | 'ai' | 'logins' | 'orders' | 'products' | 'contacts' | 'users' | 'content' | 'activity' | 'ramadan';
+
+interface ProductFormData {
+    name: string; slug: string; description: string; price: number;
+    discountPrice?: number; stock: number; unit: string; imageUrl: string;
+    category: string; healthBenefits?: string; bestFor: string[];
+    isAvailable: boolean; isFeatured: boolean;
+}
 
 function fmt(n: number) {
     return `₦${n.toLocaleString('en-NG')}`;
@@ -35,6 +42,9 @@ function AdminContent() {
     const [loading, setLoading] = useState(false);
     const [showFlashForm, setShowFlashForm] = useState(false);
     const [showPromoForm, setShowPromoForm] = useState(false);
+    const [products, setProducts] = useState<any[]>([]);
+    const [showProductForm, setShowProductForm] = useState(false);
+    const [editingProduct, setEditingProduct] = useState<any>(null);
     const tokenHandled = useRef(false);
 
     // Handle token from OAuth redirect OR fall back to localStorage/cookie-based auth
@@ -93,6 +103,9 @@ function AdminContent() {
                     setPromotions(pr);
                     break;
                 }
+                case 'products':
+                    setProducts(await productsApi.getAll());
+                    break;
             }
         } catch (e) {
             console.error('Failed to load tab data', e);
@@ -168,6 +181,46 @@ function AdminContent() {
         if (confirm('Delete?')) { await adminApi.deletePromotion(id); loadTabData('ramadan'); }
     }
 
+    // Product CRUD handlers
+    async function handleProductSubmit(e: React.FormEvent<HTMLFormElement>) {
+        e.preventDefault();
+        const form = new FormData(e.currentTarget);
+        const data = {
+            name: form.get('name') as string,
+            slug: (form.get('slug') as string) || (form.get('name') as string).toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            description: form.get('description') as string,
+            price: Number(form.get('price')),
+            discountPrice: form.get('discountPrice') ? Number(form.get('discountPrice')) : undefined,
+            stock: Number(form.get('stock')),
+            unit: (form.get('unit') as string) || 'piece',
+            imageUrl: form.get('imageUrl') as string,
+            category: (form.get('category') as string) || 'fruits',
+            healthBenefits: (form.get('healthBenefits') as string) || undefined,
+            bestFor: (form.get('bestFor') as string)?.split(',').map(s => s.trim()).filter(Boolean) || [],
+            isAvailable: form.get('isAvailable') === 'on',
+            isFeatured: form.get('isFeatured') === 'on',
+        };
+        try {
+            if (editingProduct) {
+                await adminApi.updateProduct(editingProduct.id, data);
+            } else {
+                await adminApi.createProduct(data);
+            }
+            setShowProductForm(false);
+            setEditingProduct(null);
+            loadTabData('products');
+        } catch (err: any) { alert(err.message || 'Failed to save product'); }
+    }
+    async function handleDeleteProduct(id: string) {
+        if (confirm('Delete this product? This cannot be undone.')) {
+            try { await adminApi.deleteProduct(id); loadTabData('products'); }
+            catch (err: any) { alert(err.message || 'Failed to delete'); }
+        }
+    }
+    function handleEditProduct(product: any) {
+        setEditingProduct(product);
+        setShowProductForm(true);
+    }
     if (isLoading) return (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
             <div className="spinner" style={{ width: 40, height: 40 }} />
@@ -712,8 +765,77 @@ function AdminContent() {
 
                         {/* ===== PRODUCTS ===== */}
                         {activeTab === 'products' && (
-                            <div style={{ color: 'var(--color-text-light)', fontSize: '0.92rem' }}>
-                                <p>Product management via API. Full CRUD panel coming soon.</p>
+                            <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                                    <span style={{ fontSize: '0.88rem', color: 'var(--color-text-muted)' }}>{products.length} products</span>
+                                    <button onClick={() => { setEditingProduct(null); setShowProductForm(!showProductForm); }} className="btn btn-primary btn-sm">
+                                        {showProductForm ? 'Cancel' : '+ Add Fruit'}
+                                    </button>
+                                </div>
+
+                                {showProductForm && (
+                                    <form onSubmit={handleProductSubmit} style={{ background: 'var(--color-bg-alt)', borderRadius: 'var(--radius-md)', padding: 20, marginBottom: 20 }}>
+                                        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 16 }}>{editingProduct ? '✏️ Edit Product' : '🍎 New Product'}</h3>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                            <div className="form-group"><label className="form-label">Name *</label><input name="name" className="form-input" required defaultValue={editingProduct?.name} /></div>
+                                            <div className="form-group"><label className="form-label">Slug</label><input name="slug" className="form-input" placeholder="auto-generated" defaultValue={editingProduct?.slug} /></div>
+                                            <div className="form-group"><label className="form-label">Price (₦) *</label><input name="price" type="number" className="form-input" required min="0" step="0.01" defaultValue={editingProduct?.price} /></div>
+                                            <div className="form-group"><label className="form-label">Discount Price (₦)</label><input name="discountPrice" type="number" className="form-input" min="0" step="0.01" defaultValue={editingProduct?.discountPrice} /></div>
+                                            <div className="form-group"><label className="form-label">Stock *</label><input name="stock" type="number" className="form-input" required min="0" defaultValue={editingProduct?.stock ?? 0} /></div>
+                                            <div className="form-group"><label className="form-label">Unit</label>
+                                                <select name="unit" className="form-input" defaultValue={editingProduct?.unit || 'piece'}>
+                                                    <option value="piece">Piece</option><option value="kg">Kg</option><option value="bunch">Bunch</option><option value="pack">Pack</option>
+                                                </select>
+                                            </div>
+                                            <div className="form-group"><label className="form-label">Image URL *</label><input name="imageUrl" className="form-input" required defaultValue={editingProduct?.imageUrl} /></div>
+                                            <div className="form-group"><label className="form-label">Category</label><input name="category" className="form-input" defaultValue={editingProduct?.category || 'fruits'} /></div>
+                                            <div className="form-group" style={{ gridColumn: '1 / -1' }}><label className="form-label">Description *</label><textarea name="description" className="form-input" rows={2} required defaultValue={editingProduct?.description} /></div>
+                                            <div className="form-group" style={{ gridColumn: '1 / -1' }}><label className="form-label">Health Benefits</label><textarea name="healthBenefits" className="form-input" rows={2} placeholder="Rich in Vitamin C, boosts immunity..." defaultValue={editingProduct?.healthBenefits} /></div>
+                                            <div className="form-group"><label className="form-label">Best For (comma separated)</label><input name="bestFor" className="form-input" placeholder="diabetes, weight-loss, immunity" defaultValue={editingProduct?.bestFor?.join(', ')} /></div>
+                                            <div style={{ display: 'flex', gap: 20, alignItems: 'center', padding: '8px 0' }}>
+                                                <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: '0.88rem' }}><input type="checkbox" name="isAvailable" defaultChecked={editingProduct?.isAvailable ?? true} /> Available</label>
+                                                <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: '0.88rem' }}><input type="checkbox" name="isFeatured" defaultChecked={editingProduct?.isFeatured ?? false} /> Featured</label>
+                                            </div>
+                                        </div>
+                                        <button type="submit" className="btn btn-primary btn-sm" style={{ marginTop: 12 }}>{editingProduct ? 'Update Product' : 'Create Product'}</button>
+                                    </form>
+                                )}
+
+                                <table className="data-table">
+                                    <thead><tr><th>Image</th><th>Name</th><th>Price</th><th>Stock</th><th>Category</th><th>Status</th><th>Actions</th></tr></thead>
+                                    <tbody>
+                                        {products.map((p: any) => (
+                                            <tr key={p.id}>
+                                                <td><img src={p.imageUrl} alt={p.name} style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} /></td>
+                                                <td>
+                                                    <div style={{ fontWeight: 500 }}>{p.name}</div>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>/{p.slug}</div>
+                                                </td>
+                                                <td>
+                                                    {p.discountPrice ? (
+                                                        <><span style={{ textDecoration: 'line-through', color: 'var(--color-text-muted)', fontSize: '0.82rem' }}>{fmt(Number(p.price))}</span> <strong style={{ color: 'var(--color-accent)' }}>{fmt(Number(p.discountPrice))}</strong></>
+                                                    ) : <strong>{fmt(Number(p.price))}</strong>}
+                                                </td>
+                                                <td><span style={{ color: p.stock < 5 ? 'var(--color-error)' : p.stock < 20 ? '#f59e0b' : 'var(--color-primary)', fontWeight: 600 }}>{p.stock}</span> {p.unit}</td>
+                                                <td><span className="status-badge status-processing">{p.category}</span></td>
+                                                <td>
+                                                    <div style={{ display: 'flex', gap: 4 }}>
+                                                        {p.isAvailable && <span className="status-badge status-delivered" style={{ fontSize: '0.7rem' }}>Available</span>}
+                                                        {p.isFeatured && <span className="status-badge status-confirmed" style={{ fontSize: '0.7rem' }}>Featured</span>}
+                                                        {!p.isAvailable && <span className="status-badge status-cancelled" style={{ fontSize: '0.7rem' }}>Unavailable</span>}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div style={{ display: 'flex', gap: 6 }}>
+                                                        <button onClick={() => handleEditProduct(p)} className="btn btn-ghost btn-sm" style={{ fontSize: '0.78rem' }}>Edit</button>
+                                                        <button onClick={() => handleDeleteProduct(p.id)} className="btn btn-ghost btn-sm" style={{ fontSize: '0.78rem', color: 'var(--color-error)' }}>Delete</button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {products.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-muted)' }}>No products yet. Click "+ Add Fruit" to get started.</td></tr>}
+                                    </tbody>
+                                </table>
                             </div>
                         )}
 

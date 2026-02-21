@@ -16,7 +16,7 @@ export default function AiAdvisorPage() {
         {
             role: 'ai',
             content:
-                "Hello! I'm the SelebrityAboki Health Advisor. Ask me anything about fruits, nutrition, or what fruits are best for your health goals. I'm here to help you make the healthiest choices!",
+                "Hello! I'm the SelebrityAboki Fruit Health Advisor. I can help you with:\n\n- Which fruits are best for your health condition\n- Nutritional benefits of specific fruits\n- Fruit recommendations for weight loss, immunity, diabetes, etc.\n- What's fresh and available at SelebrityAboki Fruit\n\nPlease note: I only answer questions about fruits and nutrition. Ask me anything!",
         },
     ]);
     const [input, setInput] = useState('');
@@ -46,15 +46,23 @@ export default function AiAdvisorPage() {
             const { response } = await aiApi.chat(userMessage, condition || undefined);
             setMessages((prev) => [...prev, { role: 'ai', content: response }]);
         } catch (error: any) {
+            let errorMsg: string;
+            switch (error.status) {
+                case 429:
+                    errorMsg = "You've sent too many messages. Please wait a moment and try again.";
+                    break;
+                case 401:
+                    errorMsg = "Your session has expired. Please sign in again to continue chatting.";
+                    break;
+                case 400:
+                    errorMsg = error.message || "I can only answer questions about fruits and nutrition. Could you rephrase your question?";
+                    break;
+                default:
+                    errorMsg = "I specialize in fruits and nutrition advice for SelebrityAboki Fruit. Please ask me about fruits, health benefits, or what to eat for your condition — I'm here to help!";
+            }
             setMessages((prev) => [
                 ...prev,
-                {
-                    role: 'ai',
-                    content:
-                        error.status === 429
-                            ? "You've sent too many messages. Please wait a moment and try again."
-                            : 'Sorry, I had trouble responding. Please try again.',
-                },
+                { role: 'ai', content: errorMsg },
             ]);
         }
         setLoading(false);
@@ -157,7 +165,7 @@ export default function AiAdvisorPage() {
                                 <input
                                     type="text"
                                     className="chat-input"
-                                    placeholder={isAuthenticated ? 'Ask about fruits and health...' : 'Sign in to chat with the advisor'}
+                                    placeholder={isAuthenticated ? 'Ask about fruits, nutrition, or health benefits...' : 'Sign in to chat with the advisor'}
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
