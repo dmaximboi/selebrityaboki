@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
-import { adminApi, productsApi } from '@/lib/api';
+import { adminApi, productsApi, authApi } from '@/lib/api';
 
 type Tab = 'dashboard' | 'analytics' | 'ai' | 'logins' | 'orders' | 'products' | 'contacts' | 'users' | 'content' | 'activity' | 'ramadan';
 
@@ -65,9 +65,7 @@ function AdminContent() {
         }
     }, [searchParams, login, checkAuth, router]);
 
-    useEffect(() => {
-        if (!isLoading && !isAdmin) router.push('/');
-    }, [isLoading, isAdmin, router]);
+    // Removed: auto-redirect breaks admin login flow. Show error below instead.
 
     const loadTabData = useCallback(async (tab: Tab) => {
         setLoading(true);
@@ -227,7 +225,22 @@ function AdminContent() {
             <div className="spinner" style={{ width: 40, height: 40 }} />
         </div>
     );
-    if (!isAdmin) return null;
+    if (!isAdmin) return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: 16, padding: 40, textAlign: 'center' }}>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>🔒 Admin Access Required</h1>
+            {user ? (
+                <>
+                    <p style={{ color: 'var(--color-text-muted)' }}>Signed in as <strong>{user.email}</strong> (role: {user.role})</p>
+                    <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>Your account does not have admin privileges. Contact the owner to get admin access.</p>
+                </>
+            ) : (
+                <>
+                    <p style={{ color: 'var(--color-text-muted)' }}>You need to sign in with an admin Google account.</p>
+                    <a href={authApi.getGoogleAuthUrl()} className="btn btn-primary">Sign in with Google</a>
+                </>
+            )}
+        </div>
+    );
 
     const tabs: { key: Tab; label: string; icon: string }[] = [
         { key: 'dashboard', label: 'Dashboard', icon: '📊' },
@@ -263,14 +276,17 @@ function AdminContent() {
                             <button
                                 onClick={() => setActiveTab(tab.key)}
                                 className={`admin-nav-item ${activeTab === tab.key ? 'active' : ''}`}
-                                style={{ width: '100%', textAlign: 'left' }}
+                                style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10 }}
                             >
-                                {tab.icon} {tab.label}
+                                <span style={{ fontSize: '1.2rem' }}>{tab.icon}</span>
+                                <span>{tab.label}</span>
                             </button>
                         </li>
                     ))}
                     <li style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                        <a href="/" className="admin-nav-item" style={{ textDecoration: 'none' }}>← Back to Site</a>
+                        <a href="/" className="admin-nav-item" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span>🏠</span> <span>Back to Site</span>
+                        </a>
                     </li>
                 </ul>
                 <div style={{ padding: '16px 24px', marginTop: 'auto', fontSize: '0.8rem', color: 'rgba(245,245,240,0.4)' }}>
@@ -281,10 +297,30 @@ function AdminContent() {
 
             {/* Content */}
             <main className="admin-content">
-                <div className="admin-header">
-                    <h1 className="admin-page-title">
-                        {tabs.find((t) => t.key === activeTab)?.label}
-                    </h1>
+                <div className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        {activeTab !== 'dashboard' && (
+                            <button onClick={() => setActiveTab('dashboard')} className="btn btn-ghost btn-sm" style={{ padding: '4px 8px' }}>
+                                ← Back
+                            </button>
+                        )}
+                        <h1 className="admin-page-title" style={{ margin: 0 }}>
+                            {tabs.find((t) => t.key === activeTab)?.label}
+                        </h1>
+                    </div>
+
+                    {/* Tiny Mobile Tab Scroller */}
+                    <div className="mobile-tabs-only" style={{ display: 'none', overflowX: 'auto', whiteSpace: 'nowrap', width: '100%', paddingBottom: 8, gap: 8 }}>
+                        {tabs.map(t => (
+                            <button key={t.key} onClick={() => setActiveTab(t.key)} style={{
+                                padding: '6px 12px', borderRadius: 20, border: '1px solid var(--color-border)',
+                                background: activeTab === t.key ? 'var(--color-primary)' : 'white',
+                                color: activeTab === t.key ? 'white' : 'var(--color-text)',
+                                fontSize: '0.75rem', fontWeight: 600
+                            }}>{t.label}</button>
+                        ))}
+                    </div>
+
                     <button onClick={() => loadTabData(activeTab)} className="btn btn-ghost btn-sm">
                         ↻ Refresh
                     </button>
@@ -299,24 +335,23 @@ function AdminContent() {
                         {/* ===== DASHBOARD ===== */}
                         {activeTab === 'dashboard' && dashData && (
                             <>
-                                {/* KPI Cards */}
-                                <div className="stat-grid" style={{ marginBottom: 24 }}>
-                                    <div className="stat-item">
+                                <div className="stat-grid" style={{ marginBottom: 24, gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', display: 'grid', gap: 16 }}>
+                                    <div className="stat-item clickable-card" onClick={() => setActiveTab('orders')} style={{ cursor: 'pointer', transition: 'transform 0.2s' }}>
                                         <div className="stat-value">{dashData.orders?.total || 0}</div>
                                         <div className="stat-label">Total Orders</div>
                                         <div className="stat-change positive">+{dashData.orders?.today || 0} today</div>
                                     </div>
-                                    <div className="stat-item">
+                                    <div className="stat-item clickable-card" onClick={() => setActiveTab('analytics')} style={{ cursor: 'pointer', transition: 'transform 0.2s' }}>
                                         <div className="stat-value">{fmt(dashData.revenue?.total || 0)}</div>
                                         <div className="stat-label">Total Revenue</div>
                                         <div className="stat-change positive">{fmt(dashData.revenue?.today || 0)} today</div>
                                     </div>
-                                    <div className="stat-item">
+                                    <div className="stat-item clickable-card" onClick={() => setActiveTab('users')} style={{ cursor: 'pointer', transition: 'transform 0.2s' }}>
                                         <div className="stat-value">{dashData.users?.total || 0}</div>
                                         <div className="stat-label">Registered Users</div>
                                         <div className="stat-change positive">+{dashData.users?.newToday || 0} today</div>
                                     </div>
-                                    <div className="stat-item">
+                                    <div className="stat-item clickable-card" onClick={() => setActiveTab('ai')} style={{ cursor: 'pointer', transition: 'transform 0.2s' }}>
                                         <div className="stat-value">{dashData.ai?.totalChats || 0}</div>
                                         <div className="stat-label">AI Requests</div>
                                         <div className="stat-change positive">+{dashData.ai?.todayChats || 0} today</div>

@@ -113,30 +113,63 @@ BUSINESS INFORMATION:
         // 4. Sanitize input
         const sanitizedMessage = this.sanitizeInput(userMessage);
 
-        // 5. Build context-aware prompt
+        // 5. Build context-aware prompt with real inventory data
+        let inventoryContext = "";
+        try {
+            const availableProducts = await this.prisma.product.findMany({
+                where: { isAvailable: true },
+                select: { name: true, price: true, healthBenefits: true, unit: true }
+            });
+
+            if (availableProducts.length > 0) {
+                inventoryContext = "AVAILABLE PRODUCTS AT SELEBRITYABOKI FRUIT:\n" +
+                    availableProducts.map(p => `- ${p.name}: ₦${p.price.toLocaleString()} per ${p.unit}. Benefits: ${p.healthBenefits || 'Fresh and organic'}`).join("\n");
+            }
+        } catch (e) {
+            this.logger.error("Failed to fetch products for AI context", e);
+        }
+
         const contextPrompt = condition
             ? `User has mentioned they are dealing with: ${condition}. `
             : '';
 
         try {
-            // 6. Call Groq API
-            const completion = await this.groq.chat.completions.create({
-                messages: [
-                    { role: 'system', content: this.SYSTEM_INSTRUCTION },
-                    {
-                        role: 'user',
-                        content: `${contextPrompt}User question: ${sanitizedMessage}`,
-                    },
-                ],
-                model: 'llama3-70b-8192',
-                temperature: 0.3, // Low creativity = High consistency
-                max_tokens: 300,
-                top_p: 0.9,
-            });
+            // 6. Call Groq API with fallback logic
+            let completion;
+            try {
+                // Try newer model first
+                completion = await this.groq.chat.completions.create({
+                    messages: [
+                        { role: 'system', content: this.SYSTEM_INSTRUCTION + "\n\n" + inventoryContext },
+                        {
+                            role: 'user',
+                            content: `${contextPrompt}User question: ${sanitizedMessage}\n\nNote: Recommend specific products listed above if they fit the user's needs. Mention they are available for purchase.`,
+                        },
+                    ],
+                    model: 'llama-3.1-8b-instant',
+                    temperature: 0.4,
+                    max_tokens: 400,
+                });
+            } catch (innerErr) {
+                this.logger.warn(`Primary model failed, trying fallback: ${innerErr.message}`);
+                // Fallback model
+                completion = await this.groq.chat.completions.create({
+                    messages: [
+                        { role: 'system', content: this.SYSTEM_INSTRUCTION + "\n\n" + inventoryContext },
+                        {
+                            role: 'user',
+                            content: `${contextPrompt}User: ${sanitizedMessage}`,
+                        },
+                    ],
+                    model: 'llama3-8b-8192',
+                    temperature: 0.4,
+                    max_tokens: 400,
+                });
+            }
 
             const aiResponse =
                 completion.choices[0]?.message?.content ||
-                'I apologize, but I am currently organizing our fruit inventory. Please try again shortly.';
+                'I can certainly help you with fruit choices! Based on what we have fresh today...';
 
             // 7. Log conversation for personalization
             await this.logConversation(userId, sanitizedMessage, aiResponse, condition);
