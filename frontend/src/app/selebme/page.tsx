@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { adminApi } from '@/lib/api';
@@ -15,7 +15,8 @@ function pct(part: number, total: number) {
     return `${Math.round((part / total) * 100)}%`;
 }
 
-export default function AdminPage() {
+// The actual admin panel — needs Suspense because it reads useSearchParams
+function AdminContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { user, isAdmin, isLoading, login, checkAuth } = useAuthStore();
@@ -36,7 +37,7 @@ export default function AdminPage() {
     const [showPromoForm, setShowPromoForm] = useState(false);
     const tokenHandled = useRef(false);
 
-    // Handle token from OAuth redirect OR fall back to cookie-based refresh
+    // Handle token from OAuth redirect OR fall back to localStorage/cookie-based auth
     useEffect(() => {
         if (tokenHandled.current) return;
         tokenHandled.current = true;
@@ -49,7 +50,7 @@ export default function AdminPage() {
                 router.replace('/selebme');
             });
         } else {
-            // No token in URL — try cookie-based refresh
+            // No token in URL — try localStorage/cookie-based auth
             checkAuth();
         }
     }, [searchParams, login, checkAuth, router]);
@@ -856,5 +857,18 @@ export default function AdminPage() {
                 )}
             </main>
         </div>
+    );
+}
+
+// Wrap in Suspense so useSearchParams works correctly in Next.js 13+
+export default function AdminPage() {
+    return (
+        <Suspense fallback={
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+                <div className="spinner" style={{ width: 40, height: 40 }} />
+            </div>
+        }>
+            <AdminContent />
+        </Suspense>
     );
 }

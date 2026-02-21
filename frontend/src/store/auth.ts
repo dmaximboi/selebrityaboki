@@ -95,8 +95,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
         // 2) Fallback: try cookie-based refresh (works on same domain)
         try {
+            // Use relative URL in production so the request goes through
+            // the Vercel rewrite proxy (same-origin, avoids CORS)
+            const apiBase =
+                typeof window !== 'undefined' && process.env.NODE_ENV === 'production'
+                    ? '/api'
+                    : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api');
+
             const res = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/auth/refresh`,
+                `${apiBase}/auth/refresh`,
                 { method: 'POST', credentials: 'include' }
             );
 

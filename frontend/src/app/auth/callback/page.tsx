@@ -1,55 +1,32 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
-import { Suspense } from 'react';
 
 function CallbackContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { login } = useAuthStore();
 
     useEffect(() => {
-        const getCookie = (name: string) => {
-            const value = `; ${document.cookie}`;
-            const parts = value.split(`; ${name}=`);
-            if (parts.length === 2) return parts.pop()?.split(';').shift();
-            return null;
-        };
+        // Token is passed in the URL as ?t=<accessToken>
+        // This avoids cross-origin cookie issues (render.com ≠ vercel.app)
+        const token = searchParams.get('t');
 
-        const token = getCookie('auth_token_handoff');
+        const returnTo = localStorage.getItem('auth_return_to') || '/';
+        localStorage.removeItem('auth_return_to');
 
         if (token) {
-            // Consume the cookie immediately
-            document.cookie = 'auth_token_handoff=; Max-Age=0; path=/auth/callback;';
-
-            login(token).then(() => {
-                // Redirect to the page they came from, or home
-                const returnTo = localStorage.getItem('auth_return_to') || '/';
-                localStorage.removeItem('auth_return_to');
+            login(decodeURIComponent(token)).then(() => {
+                // Remove token from URL then redirect
                 router.replace(returnTo);
             });
         } else {
-            // No token — cookie might be blocked (sameSite issue).
-            // Try a token refresh using the httpOnly refreshToken cookie.
-            fetch(
-                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/auth/refresh`,
-                { method: 'POST', credentials: 'include' }
-            )
-                .then(async (res) => {
-                    if (res.ok) {
-                        const data = await res.json();
-                        await login(data.accessToken);
-                        const returnTo = localStorage.getItem('auth_return_to') || '/';
-                        localStorage.removeItem('auth_return_to');
-                        router.replace(returnTo);
-                    } else {
-                        router.replace('/');
-                    }
-                })
-                .catch(() => router.replace('/'));
+            // No token in URL — sign-in failed or user navigated here directly
+            router.replace('/');
         }
-    }, [login, router]);
+    }, [login, router, searchParams]);
 
     return (
         <div style={{

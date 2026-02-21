@@ -3,9 +3,21 @@
  * 
  * Centralized API communication. The frontend NEVER talks to the DB directly.
  * All requests go through this client to the backend.
+ *
+ * In production, fetch() calls use '/api' (relative) so they go through the
+ * Vercel rewrite proxy defined in next.config.js (avoids CORS).
+ * Browser navigations (OAuth) need the real backend origin.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+// For fetch() calls — use relative path in production so Vercel rewrites to backend
+const API_BASE =
+    typeof window !== 'undefined' && process.env.NODE_ENV === 'production'
+        ? '/api'                                               // same-origin, rewritten by Vercel
+        : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api');
+
+// For browser redirects (OAuth) — must be the real backend URL
+const BACKEND_ORIGIN =
+    process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 class ApiError extends Error {
     status: number;
@@ -95,7 +107,12 @@ async function request<T>(
 // AUTH API
 // ============================================
 export const authApi = {
-    getGoogleAuthUrl: () => `${API_BASE}/auth/google`,
+    // OAuth must navigate the browser to the REAL backend, not the rewrite
+    getGoogleAuthUrl: () => {
+        // Remove trailing /api if present so we get the origin only
+        const origin = BACKEND_ORIGIN.replace(/\/api\/?$/, '');
+        return `${origin}/api/auth/google`;
+    },
     getMe: () => request<any>('/auth/me'),
     logout: () => request<any>('/auth/logout', { method: 'POST' }),
     logoutAll: () => request<any>('/auth/logout-all', { method: 'POST' }),

@@ -53,10 +53,15 @@ const nextConfig = {
         ];
     },
     async rewrites() {
+        // Determine the backend origin (without /api)
+        const backendOrigin = (
+            process.env.NEXT_PUBLIC_BACKEND_URL ||
+            (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000').replace(/\/api\/?$/, '')
+        );
         return [
             {
                 source: '/api/:path*',
-                destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/:path*`,
+                destination: `${backendOrigin}/api/:path*`,
             },
         ];
     },

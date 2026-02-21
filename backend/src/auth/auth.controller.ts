@@ -58,37 +58,31 @@ export class AuthController {
         try {
             const result = await this.authService.googleLogin(user, ipAddress);
             const isProduction = this.configService.get('NODE_ENV') === 'production';
+            const frontendUrl = this.configService.get('FRONTEND_URL');
 
-            // Set HTTP-only cookie for refresh token
+            // Set HTTP-only refresh token cookie on this domain (render.com)
+            // SameSite=none + Secure so it can be sent cross-origin from Vercel
             res.cookie('refreshToken', result.refreshToken, {
                 httpOnly: true,
                 secure: isProduction,
                 sameSite: isProduction ? 'none' : 'lax',
                 path: '/',
-                maxAge: 3 * 24 * 60 * 60 * 1000, // 3 days in ms
+                maxAge: 3 * 24 * 60 * 60 * 1000, // 3-day sliding window
             });
 
-            // Handoff cookie — readable by JS, short-lived, cross-site safe
-            res.cookie('auth_token_handoff', result.accessToken, {
-                httpOnly: false,
-                secure: isProduction,
-                sameSite: isProduction ? 'none' : 'lax',
-                path: '/',
-                maxAge: 30 * 1000, // 30 seconds
-            });
+            // Pass access token in the redirect URL — cookies are domain-scoped
+            // and can't be read by JS on a different origin (render.com ≠ vercel.app)
+            const encodedToken = encodeURIComponent(result.accessToken);
+            const callbackPath = this.authService.isAdmin(result.user)
+                ? '/selebme'
+                : '/auth/callback';
 
-            const frontendUrl = this.configService.get('FRONTEND_URL');
-            const redirectUrl = this.authService.isAdmin(result.user)
-                ? `${frontendUrl}/selebme`
-                : `${frontendUrl}/auth/callback`;
-
-            return res.redirect(redirectUrl);
+            return res.redirect(`${frontendUrl}${callbackPath}?t=${encodedToken}`);
         } catch (error: any) {
             this.logger.error(
                 `Google callback failed: ${error?.message}`,
                 error?.stack,
             );
-            this.logger.error(`req.user was: ${JSON.stringify(user)}`);
 
             const frontendUrl = this.configService.get('FRONTEND_URL');
             return res.redirect(`${frontendUrl}/auth/error?code=AUTH_FAILED`);
@@ -116,9 +110,9 @@ export class AuthController {
             res.cookie('refreshToken', tokens.refreshToken, {
                 httpOnly: true,
                 secure: isProduction,
-                sameSite: 'lax',
+                sameSite: isProduction ? 'none' : 'lax',
                 path: '/',
-                maxAge: 7 * 24 * 60 * 60 * 1000,
+                maxAge: 3 * 24 * 60 * 60 * 1000, // 3-day sliding window
             });
 
             return res.json({ accessToken: tokens.accessToken });
