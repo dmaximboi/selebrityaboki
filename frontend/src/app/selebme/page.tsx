@@ -98,9 +98,10 @@ function AdminContent() {
                     setActivity(await adminApi.getActivity());
                     break;
                 case 'ramadan': {
-                    const [fs, pr] = await Promise.all([adminApi.getFlashSales(), adminApi.getPromotions()]);
+                    const [fs, pr, prods] = await Promise.all([adminApi.getFlashSales(), adminApi.getPromotions(), productsApi.getAll()]);
                     setFlashSales(fs);
                     setPromotions(pr);
+                    setProducts(prods);
                     break;
                 }
                 case 'products':
@@ -787,7 +788,12 @@ function AdminContent() {
                                                     <option value="piece">Piece</option><option value="kg">Kg</option><option value="bunch">Bunch</option><option value="pack">Pack</option>
                                                 </select>
                                             </div>
-                                            <div className="form-group"><label className="form-label">Image URL *</label><input name="imageUrl" className="form-input" required defaultValue={editingProduct?.imageUrl} /></div>
+                                            <div className="form-group">
+                                                <label className="form-label">Image Link (imgbb) *</label>
+                                                <input name="imageUrl" className="form-input" required placeholder="https://i.ibb.co/xxxxx/fruit.jpg" defaultValue={editingProduct?.imageUrl} onChange={(e) => { const preview = document.getElementById('img-preview') as HTMLImageElement; if (preview) preview.src = e.target.value; }} />
+                                                <small style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>Upload at <a href="https://imgbb.com/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)' }}>imgbb.com</a> → paste the direct link here</small>
+                                                {(editingProduct?.imageUrl) && <img id="img-preview" src={editingProduct?.imageUrl} alt="preview" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 6, marginTop: 8 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
+                                            </div>
                                             <div className="form-group"><label className="form-label">Category</label><input name="category" className="form-input" defaultValue={editingProduct?.category || 'fruits'} /></div>
                                             <div className="form-group" style={{ gridColumn: '1 / -1' }}><label className="form-label">Description *</label><textarea name="description" className="form-input" rows={2} required defaultValue={editingProduct?.description} /></div>
                                             <div className="form-group" style={{ gridColumn: '1 / -1' }}><label className="form-label">Health Benefits</label><textarea name="healthBenefits" className="form-input" rows={2} placeholder="Rich in Vitamin C, boosts immunity..." defaultValue={editingProduct?.healthBenefits} /></div>
@@ -880,12 +886,18 @@ function AdminContent() {
                                     {showFlashForm && (
                                         <form onSubmit={handleCreateFlashSale} style={{ background: 'var(--color-bg-alt)', borderRadius: 'var(--radius-md)', padding: 20, marginBottom: 20 }}>
                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                                                <div className="form-group"><label className="form-label">Product ID</label><input name="productId" className="form-input" required /></div>
-                                                <div className="form-group"><label className="form-label">Sale Price (₦)</label><input name="salePrice" type="number" className="form-input" required min="0" /></div>
-                                                <div className="form-group"><label className="form-label">Image URL</label><input name="imageUrl" className="form-input" /></div>
+                                                <div className="form-group"><label className="form-label">Select Product *</label>
+                                                    <select name="productId" className="form-input" required>
+                                                        <option value="">Choose a fruit...</option>
+                                                        {products.map((p: any) => <option key={p.id} value={p.id}>{p.name} — ₦{Number(p.price).toLocaleString()}</option>)}
+                                                    </select>
+                                                    {products.length === 0 && <small style={{ color: 'var(--color-error)', fontSize: '0.75rem' }}>Load products first from the Products tab</small>}
+                                                </div>
+                                                <div className="form-group"><label className="form-label">Sale Price (₦) *</label><input name="salePrice" type="number" className="form-input" required min="0" /></div>
+                                                <div className="form-group"><label className="form-label">Image Link (imgbb)</label><input name="imageUrl" className="form-input" placeholder="https://i.ibb.co/xxxxx/promo.jpg" /><small style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>Upload at <a href="https://imgbb.com/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)' }}>imgbb.com</a></small></div>
                                                 <div className="form-group"><label className="form-label">Banner Text</label><input name="bannerText" className="form-input" defaultValue="Ramadan Special!" /></div>
-                                                <div className="form-group"><label className="form-label">Start Time</label><input name="startTime" type="datetime-local" className="form-input" required /></div>
-                                                <div className="form-group"><label className="form-label">End Time</label><input name="endTime" type="datetime-local" className="form-input" required /></div>
+                                                <div className="form-group"><label className="form-label">Start Time *</label><input name="startTime" type="datetime-local" className="form-input" required /></div>
+                                                <div className="form-group"><label className="form-label">End Time *</label><input name="endTime" type="datetime-local" className="form-input" required /></div>
                                             </div>
                                             <button type="submit" className="btn btn-primary btn-sm" style={{ marginTop: 12 }}>Create Flash Sale</button>
                                         </form>

@@ -107,18 +107,22 @@ export default function ShopPage() {
                                             className="product-image"
                                             style={{
                                                 background: `linear-gradient(135deg, #e8f0e0, #fef3e2)`,
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontSize: '2.5rem',
+                                                position: 'relative',
+                                                overflow: 'hidden',
                                             }}
                                         >
-                                            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                                                <circle cx="24" cy="24" r="20" fill="rgba(26,86,50,0.1)" />
-                                                <text x="24" y="30" textAnchor="middle" fill="#1a5632" fontSize="16" fontWeight="600">
-                                                    {product.name.charAt(0)}
-                                                </text>
-                                            </svg>
+                                            {product.imageUrl ? (
+                                                <img
+                                                    src={product.imageUrl}
+                                                    alt={product.name}
+                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                />
+                                            ) : (
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+                                                    <span style={{ fontSize: '2.5rem', color: 'rgba(26,86,50,0.3)', fontWeight: 700 }}>{product.name.charAt(0)}</span>
+                                                </div>
+                                            )}
                                         </div>
                                         <h3 className="product-name">{product.name}</h3>
                                         <div>
