@@ -84,7 +84,7 @@ export class ContentService {
     // SCHEDULED TASKS - Every 12 hours
     // ============================================
 
-    @Cron(CronExpression.EVERY_12_HOURS)
+    @Cron(CronExpression.EVERY_6_HOURS)
     async generateDailyContent() {
         this.logger.log('Starting scheduled content generation...');
 

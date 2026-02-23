@@ -96,6 +96,9 @@ async function bootstrap() {
     );
 
     // Global prefix — health excluded
+    const { DecimalInterceptor } = await import('./common/interceptors/decimal.interceptor');
+    app.useGlobalInterceptors(new DecimalInterceptor());
+
     app.setGlobalPrefix('api', {
         exclude: ['health'],
     });

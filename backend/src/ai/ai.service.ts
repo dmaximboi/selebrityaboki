@@ -27,9 +27,10 @@ IDENTITY: You are the "SelebrityAboki Fruits AI" - a friendly and knowledgeable 
 
 YOUR MISSION:
 1. Help users with fruit recommendations, nutritional facts, and health tips.
-2. Be conversational and natural. If someone says "Hi" or "How are you?", respond naturally like a human advisor.
-3. Subtly guide the conversation towards fruits if it wanders too far, but don't be robotic.
-4. Recommend actual products from SelebrityAboki Fruit's inventory when they match the user's needs.
+2. IMPORTANT: Be diverse in your recommendations. Do not just mention Watermelon. SelebrityAboki has a wide variety including Oranges, Mangoes, Apples, Bananas, Pineapples, Pawpaw, Grapes, and more. Recommend based on the user's specific health needs.
+3. Be conversational and natural. If someone says "Hi" or "How are you?", respond naturally like a human advisor.
+4. Subtly guide the conversation towards fruits if it wanders too far, but don't be robotic.
+5. Recommend actual products from SelebrityAboki Fruit's inventory when they match the user's needs.
 
 RESPONSE STYLE:
 1. Warm, professional, but accessible (the "Aboki" spirit - friendly and helpful).
@@ -180,9 +181,9 @@ BUSINESS INFORMATION:
      */
     async generateContent(type: 'RIDDLE' | 'HEALTH_TIP' | 'FRUIT_FACT'): Promise<any> {
         const prompts = {
-            RIDDLE: `Create a clever riddle about a tropical or Nigerian fruit. Format as JSON only: {"question": "the riddle", "hint": "a helpful hint", "answer": "the fruit name"}. Make it challenging but solvable.`,
-            HEALTH_TIP: `Write a health tip about eating fresh fruits. Include a specific fruit and its benefit. Format as JSON only: {"title": "short title", "content": "the tip (2-3 sentences)", "fruit": "featured fruit"}. Mention SelebrityAboki Fruit naturally.`,
-            FRUIT_FACT: `Share an interesting fact about a fruit that most people don't know. Format as JSON only: {"title": "catchy title", "content": "the fact (2-3 sentences)", "fruit": "the fruit"}. Make it educational and engaging.`,
+            RIDDLE: `Create a clever riddle about a fruit (60% chance Nigerian/Tropical, 40% Global). Format as JSON only: {"question": "the riddle", "hint": "a helpful hint", "answer": "the fruit name"}. Make it challenging but solvable.`,
+            HEALTH_TIP: `Write a health tip about eating fresh fruits. Include a specific fruit and its benefit. Balance: 60% Nigerian context, 40% Global health standards. Format as JSON only: {"title": "short title", "content": "the tip (2-3 sentences)", "fruit": "featured fruit"}. Mention SelebrityAboki Fruit naturally.`,
+            FRUIT_FACT: `Share an interesting fact about a fruit. 60% focus on Nigerian/African varieties, 40% on exotic global fruits. Format as JSON only: {"title": "catchy title", "content": "the fact (2-3 sentences)", "fruit": "the fruit"}. Make it educational and engaging.`,
         };
 
         try {

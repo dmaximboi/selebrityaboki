@@ -15,9 +15,19 @@ interface ProductFormData {
 }
 
 function fmt(n: any) {
-    const val = typeof n === 'number' ? n : parseFloat(String(n));
+    if (n === null || n === undefined) return '₦0';
+    let val: number;
+    if (typeof n === 'number') {
+        val = n;
+    } else if (typeof n === 'object' && n.d && n.s) {
+        // Handle Decimal object if it leaks through
+        val = Number(n.toFixed ? n.toFixed(2) : parseFloat(String(n)));
+    } else {
+        val = parseFloat(String(n));
+    }
+
     if (isNaN(val)) return '₦0';
-    return `₦${val.toLocaleString('en-NG')}`;
+    return `₦${val.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 function pct(part: number, total: number) {
     if (!total) return '0%';
@@ -648,10 +658,11 @@ function AdminContent() {
                                                     <th>Customer</th>
                                                     <th>Items</th>
                                                     <th>Total</th>
+                                                    <th>Contact</th>
                                                     <th>Payment</th>
                                                     <th>Status</th>
                                                     <th>Date</th>
-                                                    <th>Change Status</th>
+                                                    <th>Verification & Action</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -663,10 +674,17 @@ function AdminContent() {
                                                             <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>{order.customerEmail}</div>
                                                         </td>
                                                         <td>{order.items?.length || 0}</td>
-                                                        <td style={{ fontWeight: 600 }}>{fmt(Number(order.totalAmount))}</td>
+                                                        <td style={{ fontWeight: 600 }}>{fmt(order.totalAmount)}</td>
+                                                        <td>
+                                                            {order.whatsappUrl ? (
+                                                                <a href={order.whatsappUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-xs" style={{ color: '#25D366', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                                    <span style={{ fontSize: '1.2rem' }}>💬</span> WhatsApp
+                                                                </a>
+                                                            ) : '—'}
+                                                        </td>
                                                         <td>
                                                             <span className={`status-badge ${order.paymentStatus === 'SUCCESS' ? 'status-delivered' : order.paymentStatus === 'PENDING' ? 'status-pending' : 'status-cancelled'}`}>
-                                                                {order.paymentStatus}
+                                                                {order.paymentStatus === 'SUCCESS' ? '✅ PAID' : order.paymentStatus}
                                                             </span>
                                                         </td>
                                                         <td>
@@ -675,18 +693,29 @@ function AdminContent() {
                                                             </span>
                                                         </td>
                                                         <td style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
-                                                            {new Date(order.createdAt).toLocaleDateString('en-NG')}
+                                                            {order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-NG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
                                                         </td>
                                                         <td>
-                                                            <select
-                                                                value={order.status}
-                                                                onChange={(e) => handleOrderStatus(order.id, e.target.value)}
-                                                                style={{ padding: '4px 8px', fontSize: '0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}
-                                                            >
-                                                                {['PENDING', 'CONFIRMED', 'PROCESSING', 'DELIVERED', 'CANCELLED'].map(s => (
-                                                                    <option key={s} value={s}>{s}</option>
-                                                                ))}
-                                                            </select>
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                                <select
+                                                                    value={order.status}
+                                                                    onChange={(e) => handleOrderStatus(order.id, e.target.value)}
+                                                                    style={{ padding: '6px 8px', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', width: '100%' }}
+                                                                >
+                                                                    {['PENDING', 'CONFIRMED', 'PROCESSING', 'DELIVERED', 'CANCELLED'].map(s => (
+                                                                        <option key={s} value={s}>{s === 'DELIVERED' ? 'Complete / Delivered' : s}</option>
+                                                                    ))}
+                                                                </select>
+                                                                {order.status === 'PENDING' && order.paymentStatus === 'SUCCESS' && (
+                                                                    <button
+                                                                        onClick={() => handleOrderStatus(order.id, 'CONFIRMED')}
+                                                                        className="btn btn-primary btn-xs"
+                                                                        style={{ fontSize: '0.7rem', padding: '2px 4px' }}
+                                                                    >
+                                                                        Confirm Order
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -856,8 +885,8 @@ function AdminContent() {
                                                 </td>
                                                 <td>
                                                     {p.discountPrice ? (
-                                                        <><span style={{ textDecoration: 'line-through', color: 'var(--color-text-muted)', fontSize: '0.82rem' }}>{fmt(Number(p.price))}</span> <strong style={{ color: 'var(--color-accent)' }}>{fmt(Number(p.discountPrice))}</strong></>
-                                                    ) : <strong>{fmt(Number(p.price))}</strong>}
+                                                        <><span style={{ textDecoration: 'line-through', color: 'var(--color-text-muted)', fontSize: '0.82rem' }}>{fmt(p.price)}</span> <strong style={{ color: 'var(--color-accent)' }}>{fmt(p.discountPrice)}</strong></>
+                                                    ) : <strong>{fmt(p.price)}</strong>}
                                                 </td>
                                                 <td><span style={{ color: p.stock < 5 ? 'var(--color-error)' : p.stock < 20 ? '#f59e0b' : 'var(--color-primary)', fontWeight: 600 }}>{p.stock}</span> {p.unit}</td>
                                                 <td><span className="status-badge status-processing">{p.category}</span></td>

@@ -231,7 +231,10 @@ export class OrdersService {
             throw new NotFoundException('Order not found');
         }
 
-        return order;
+        return {
+            ...order,
+            whatsappUrl: this.generateWhatsAppLink(order),
+        };
     }
 
     /**
@@ -461,7 +464,7 @@ export class OrdersService {
      * Generate WhatsApp link with order details
      * The message is crafted server-side - user cannot modify it
      */
-    private generateWhatsAppLink(order: any): string {
+    public generateWhatsAppLink(order: any): string {
         const sellerPhone = this.config.get('WHATSAPP_PHONE') || '2348032958708';
         const frontendUrl = this.config.get('FRONTEND_URL') || 'https://selebrityaboki.com';
         const receiptUrl = `${frontendUrl}/receipt/${order.id}`;

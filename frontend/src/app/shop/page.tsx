@@ -124,17 +124,17 @@ export default function ShopPage() {
                                                 </div>
                                             )}
                                         </div>
-                                        <h3 className="product-name">{product.name}</h3>
-                                        <div>
-                                            <span className="product-price">
-                                                N{Number(product.discountPrice || product.price).toLocaleString()}
+                                        <h3 className="product-name" style={{ margin: '8px 0' }}>{product.name}</h3>
+                                        <div style={{ marginBottom: 12 }}>
+                                            <span className="product-price" style={{ fontSize: '1.25rem' }}>
+                                                ₦{Number(product.discountPrice || product.price || 0).toLocaleString()}
                                             </span>
-                                            {product.discountPrice && (
+                                            {product.discountPrice && Number(product.discountPrice) < Number(product.price) && (
                                                 <span className="product-price-old">
-                                                    N{Number(product.price).toLocaleString()}
+                                                    ₦{Number(product.price).toLocaleString()}
                                                 </span>
                                             )}
-                                            <span className="product-unit"> / {product.unit}</span>
+                                            <span className="product-unit" style={{ marginLeft: 4 }}> / {product.unit}</span>
                                         </div>
                                         <p style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                                             {product.description}

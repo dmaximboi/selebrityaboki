@@ -8,9 +8,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+import { OrdersService } from '../orders/orders.service';
+
 @Injectable()
 export class AdminService {
-    constructor(private readonly prisma: PrismaService) { }
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly ordersService: OrdersService
+    ) { }
 
     /**
      * Get dashboard overview stats
@@ -243,7 +248,10 @@ export class AdminService {
         ]);
 
         return {
-            orders,
+            orders: orders.map(o => ({
+                ...o,
+                whatsappUrl: this.ordersService.generateWhatsAppLink(o)
+            })),
             pagination: {
                 page,
                 limit,

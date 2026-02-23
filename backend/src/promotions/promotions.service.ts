@@ -20,7 +20,16 @@ const ZONE_1_AREAS = [
     'ogidi',
     'oja oba',
     'okolowo',
-    'iyana technical ogidi',
+    'iyana',
+    'okolowo iyana',
+    'technical',
+    'unilorin',
+    'fate',
+    'gwanara',
+    'pake',
+    'tanke',
+    'tanker',
+    'asoo',
 ];
 
 @Injectable()
