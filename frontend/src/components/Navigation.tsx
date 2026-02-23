@@ -12,6 +12,7 @@ export default function Navigation() {
     const [mobileOpen, setMobileOpen] = useState(false);
     const { user, isAuthenticated, isAdmin, logout } = useAuthStore();
     const totalItems = useCartStore((s) => s.totalItems());
+    const toggleCart = useCartStore((s) => s.toggleCart);
 
     useEffect(() => {
         const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -82,7 +83,7 @@ export default function Navigation() {
 
                 <div className="nav-actions">
                     {isAuthenticated && (
-                        <Link href="/shop" className="btn btn-ghost btn-sm" style={{ position: 'relative' }}>
+                        <button onClick={() => toggleCart()} className="btn btn-ghost btn-sm" style={{ position: 'relative' }}>
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
                                 <line x1="3" y1="6" x2="21" y2="6" />
@@ -101,7 +102,7 @@ export default function Navigation() {
                                     {totalItems}
                                 </span>
                             )}
-                        </Link>
+                        </button>
                     )}
 
                     {isAuthenticated ? (

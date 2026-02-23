@@ -339,7 +339,7 @@ export class OrdersService {
                 tx_ref: txRef,
                 amount: order.totalAmount.toNumber(),
                 currency: 'NGN',
-                redirect_url: `${frontendUrl}/order/confirm/${orderId}`,
+                redirect_url: `${frontendUrl}/receipt?orderId=${orderId}`,
                 customer: {
                     email: order.customerEmail,
                     name: order.customerName,
@@ -451,13 +451,10 @@ export class OrdersService {
     // PRIVATE METHODS
     // ============================================
 
-    /**
-     * Generate crypto-secure order ID: SELA-XXXX-XXXX
-     */
     private generateSecureOrderId(): string {
-        const bytes = randomBytes(4);
+        const bytes = randomBytes(6);
         const hex = bytes.toString('hex').toUpperCase();
-        return `SELA-${hex.substring(0, 4)}-${hex.substring(4, 8)}`;
+        return `SELA-${hex.substring(0, 4)}-${hex.substring(4, 8)}-${hex.substring(8, 12)}`;
     }
 
     /**

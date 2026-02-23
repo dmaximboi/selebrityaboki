@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import PushNotificationProvider from '@/components/PushNotificationProvider';
+import CartDrawer from '@/components/CartDrawer';
 
 const BASE_URL = 'https://selebrityaboki.vercel.app';
 
@@ -68,6 +69,7 @@ export default function RootLayout({
             </head>
             <body>
                 <PushNotificationProvider />
+                <CartDrawer />
                 {children}
             </body>
         </html>

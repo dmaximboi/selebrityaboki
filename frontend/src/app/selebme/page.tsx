@@ -14,8 +14,10 @@ interface ProductFormData {
     isAvailable: boolean; isFeatured: boolean;
 }
 
-function fmt(n: number) {
-    return `₦${n.toLocaleString('en-NG')}`;
+function fmt(n: any) {
+    const val = typeof n === 'number' ? n : parseFloat(String(n));
+    if (isNaN(val)) return '₦0';
+    return `₦${val.toLocaleString('en-NG')}`;
 }
 function pct(part: number, total: number) {
     if (!total) return '0%';
@@ -947,8 +949,8 @@ function AdminContent() {
                                                 return (
                                                     <tr key={fs.id}>
                                                         <td>{fs.product?.name || fs.productId}</td>
-                                                        <td>₦{Number(fs.originalPrice).toLocaleString()}</td>
-                                                        <td style={{ fontWeight: 600, color: 'var(--color-accent)' }}>₦{Number(fs.salePrice).toLocaleString()}</td>
+                                                        <td>{fmt(fs.originalPrice)}</td>
+                                                        <td style={{ fontWeight: 600, color: 'var(--color-accent)' }}>{fmt(fs.salePrice)}</td>
                                                         <td><span className="status-badge status-confirmed">{disc}% OFF</span></td>
                                                         <td style={{ fontSize: '0.82rem' }}>{new Date(fs.startTime).toLocaleString('en-NG')}</td>
                                                         <td style={{ fontSize: '0.82rem' }}>{new Date(fs.endTime).toLocaleString('en-NG')}</td>

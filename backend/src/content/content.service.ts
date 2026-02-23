@@ -75,8 +75,9 @@ export class ContentService {
     /**
      * Manually trigger content generation (admin)
      */
-    async generateNow(type: 'RIDDLE' | 'HEALTH_TIP' | 'FRUIT_FACT') {
-        return this.createContent(type);
+    async generateNow(type: string) {
+        const normalizedType = type.toUpperCase() as 'RIDDLE' | 'HEALTH_TIP' | 'FRUIT_FACT';
+        return this.createContent(normalizedType);
     }
 
     // ============================================
