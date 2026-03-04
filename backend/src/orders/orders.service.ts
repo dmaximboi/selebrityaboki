@@ -1,10 +1,3 @@
-/**
- * Orders Service
- * 
- * THE BRAIN: All order logic happens here
- * Frontend NEVER sends prices - only product IDs and quantities
- */
-
 import {
     Injectable,
     BadRequestException,
@@ -15,7 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReferralsService } from '../referrals/referrals.service';
 import { PromotionsService } from '../promotions/promotions.service';
-import { randomBytes } from 'crypto';
+import { randomBytes, createHmac } from 'crypto';
 import { Decimal } from '@prisma/client/runtime/library';
 
 interface CreateOrderItem {
@@ -30,6 +23,7 @@ interface CreateOrderDto {
     customerPhone: string;
     deliveryAddress: string;
     notes?: string;
+    referralCode?: string;
 }
 
 @Injectable()
@@ -43,17 +37,15 @@ export class OrdersService {
         private readonly promotionsService: PromotionsService,
     ) { }
 
-    /**
-     * Create a new order with crypto-secure ID
-     * 
-     * SECURITY: We ONLY accept product IDs and quantities
-     * Prices are fetched from the database - NEVER from frontend
-     */
     async createOrder(userId: string | null, dto: CreateOrderDto) {
         const { items, customerName, customerEmail, customerPhone, deliveryAddress, notes } = dto;
 
         if (!items || items.length === 0) {
             throw new BadRequestException('Order must contain at least one item');
+        }
+
+        if (items.length > 20) {
+            throw new BadRequestException('Too many items in a single order');
         }
 
         let calculatedTotal = new Decimal(0);
@@ -63,8 +55,11 @@ export class OrdersService {
             priceAtTime: Decimal;
         }> = [];
 
-        // Validate each item and calculate total from DATABASE prices
         for (const item of items) {
+            if (!item.productId || typeof item.productId !== 'string' || item.productId.length > 100) {
+                throw new BadRequestException('Invalid product ID');
+            }
+
             const product = await this.prisma.product.findUnique({
                 where: { id: item.productId },
             });
@@ -89,7 +84,6 @@ export class OrdersService {
                 );
             }
 
-            // Use flash sale price if available, then discount price, then regular price
             const flashSalePrice = await this.promotionsService.getFlashSalePrice(item.productId);
             const unitPrice = flashSalePrice || product.discountPrice || product.price;
             const lineTotal = unitPrice.mul(item.quantity);
@@ -102,11 +96,8 @@ export class OrdersService {
             });
         }
 
-        // ============================================
-        // REFERRAL DISCOUNT (server-calculated)
-        // ============================================
         let discountAmount = new Decimal(0);
-        let appliedReferralCode: string | null = null;
+        let appliedReferralCode: string | null = dto.referralCode || null;
 
         if (userId) {
             const reward = await this.referralsService.checkReferralReward(userId);
@@ -114,14 +105,18 @@ export class OrdersService {
                 discountAmount = calculatedTotal.mul(reward.discountPercent).div(100);
                 await this.referralsService.consumeReward(userId);
                 appliedReferralCode = 'REWARD_APPLIED';
-                this.logger.log(`Referral discount applied: ${reward.discountPercent}% = ₦${discountAmount}`);
+                this.logger.log(`Referral reward applied for ${userId}`);
             }
         }
 
-        // ============================================
-        // DELIVERY ZONE DISCOUNT (server-calculated)
-        // ============================================
-        const deliveryFee = new Decimal(2000); // Base delivery fee ₦2,000
+        if (!discountAmount.gt(0) && dto.referralCode) {
+            const validation = await this.referralsService.validateCode(dto.referralCode);
+            if (validation.valid) {
+                discountAmount = calculatedTotal.mul(5).div(100);
+            }
+        }
+
+        const deliveryFee = new Decimal(2000);
         const deliveryResult = await this.promotionsService.calculateDeliveryDiscount(
             calculatedTotal,
             deliveryFee,
@@ -130,12 +125,9 @@ export class OrdersService {
 
         const finalTotal = calculatedTotal.sub(discountAmount).add(deliveryFee).sub(deliveryResult.discountAmount);
 
-        // Generate crypto-secure order ID: SELA-XXXX-XXXX
         const secureId = this.generateSecureOrderId();
 
-        // Create order in transaction (atomic operation)
         const order = await this.prisma.$transaction(async (tx) => {
-            // 1. Create the order
             const newOrder = await tx.order.create({
                 data: {
                     id: secureId,
@@ -169,7 +161,6 @@ export class OrdersService {
                 },
             });
 
-            // 2. Decrease stock for each product
             for (const item of orderItems) {
                 await tx.product.update({
                     where: { id: item.productId },
@@ -182,15 +173,13 @@ export class OrdersService {
             return newOrder;
         });
 
-        // Generate WhatsApp link (server-side)
         const whatsappUrl = this.generateWhatsAppLink(order);
 
-        // Complete referral for referred user (if applicable)
         if (userId) {
             await this.referralsService.completeReferral(userId, secureId);
         }
 
-        this.logger.log(`Order created: ${secureId} for ${customerPhone}`);
+        this.logger.log(`Order created: ${secureId}`);
 
         return {
             success: true,
@@ -206,10 +195,11 @@ export class OrdersService {
         };
     }
 
-    /**
-     * Get order by ID
-     */
     async getOrder(orderId: string) {
+        if (!orderId || !/^SAF-[A-Za-z0-9]{5}$/.test(orderId)) {
+            throw new BadRequestException('Invalid order ID format');
+        }
+
         const order = await this.prisma.order.findUnique({
             where: { id: orderId },
             include: {
@@ -237,9 +227,6 @@ export class OrdersService {
         };
     }
 
-    /**
-     * Get user's orders
-     */
     async getUserOrders(userId: string) {
         return this.prisma.order.findMany({
             where: { userId },
@@ -259,9 +246,6 @@ export class OrdersService {
         });
     }
 
-    /**
-     * Update order status (admin only)
-     */
     async updateOrderStatus(
         orderId: string,
         status: 'CONFIRMED' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED'
@@ -274,14 +258,12 @@ export class OrdersService {
             throw new NotFoundException('Order not found');
         }
 
-        // If cancelling, restore stock
         if (status === 'CANCELLED' && order.status !== 'CANCELLED') {
             const items = await this.prisma.orderItem.findMany({
                 where: { orderId },
             });
 
             await this.prisma.$transaction(async (tx) => {
-                // Restore stock
                 for (const item of items) {
                     await tx.product.update({
                         where: { id: item.productId },
@@ -291,7 +273,6 @@ export class OrdersService {
                     });
                 }
 
-                // Update order status
                 await tx.order.update({
                     where: { id: orderId },
                     data: { status },
@@ -310,10 +291,6 @@ export class OrdersService {
         return { success: true, status };
     }
 
-    /**
-     * Initialize Flutterwave payment for an order
-     * Returns a payment link that the frontend redirects to
-     */
     async initializePayment(orderId: string) {
         const order = await this.prisma.order.findUnique({
             where: { id: orderId },
@@ -328,10 +305,9 @@ export class OrdersService {
             throw new BadRequestException('Order already paid');
         }
 
-        const txRef = `SELA-PAY-${orderId}-${Date.now()}`;
+        const txRef = `SAF-PAY-${orderId}-${randomBytes(8).toString('hex')}`;
         const frontendUrl = this.config.get('FRONTEND_URL') || 'http://localhost:3000';
 
-        // Call Flutterwave API to create payment
         const response = await fetch('https://api.flutterwave.com/v3/payments', {
             method: 'POST',
             headers: {
@@ -362,11 +338,10 @@ export class OrdersService {
         const result = await response.json();
 
         if (result.status !== 'success') {
-            this.logger.error(`Flutterwave init failed: ${JSON.stringify(result)}`);
+            this.logger.error('Flutterwave init failed');
             throw new BadRequestException('Payment initialization failed');
         }
 
-        // Save payment ref to order
         await this.prisma.order.update({
             where: { id: orderId },
             data: {
@@ -375,8 +350,6 @@ export class OrdersService {
             },
         });
 
-        this.logger.log(`Payment initialized for order ${orderId}: ${txRef}`);
-
         return {
             success: true,
             paymentLink: result.data.link,
@@ -384,27 +357,25 @@ export class OrdersService {
         };
     }
 
-    /**
-     * Verify Flutterwave transaction server-side and confirm order
-     * Called from webhook — NEVER trust frontend
-     */
     async verifyAndConfirmPayment(txRef: string, transactionId: number, amount: number) {
-        // 1. Find the order by tx_ref
+        if (!txRef || !transactionId || !amount) {
+            this.logger.warn('Invalid webhook payload — missing required fields');
+            return { success: false };
+        }
+
         const order = await this.prisma.order.findFirst({
             where: { paymentRef: txRef },
         });
 
         if (!order) {
-            this.logger.warn(`Payment received for unknown tx_ref: ${txRef}`);
+            this.logger.warn('Payment received for unknown tx_ref');
             return { success: false };
         }
 
         if (order.paymentStatus === 'SUCCESS') {
-            this.logger.log(`Order ${order.id} already confirmed, skipping`);
             return { success: true, orderId: order.id };
         }
 
-        // 2. Verify transaction with Flutterwave API (server-side verification)
         const verifyResponse = await fetch(
             `https://api.flutterwave.com/v3/transactions/${transactionId}/verify`,
             {
@@ -421,21 +392,27 @@ export class OrdersService {
             verification.data.status !== 'successful' ||
             verification.data.currency !== 'NGN'
         ) {
+            this.logger.warn(`Payment verification failed for order ${order.id}`);
+            return { success: false };
+        }
+
+        const expectedRef = order.paymentRef;
+        if (verification.data.tx_ref !== expectedRef) {
+            this.logger.warn(`tx_ref mismatch for order ${order.id}: expected ${expectedRef}`);
+            return { success: false };
+        }
+
+        const verifiedAmount = Number(verification.data.amount);
+        const orderAmount = order.totalAmount.toNumber();
+        const tolerance = 0.5;
+
+        if (verifiedAmount < orderAmount - tolerance) {
             this.logger.warn(
-                `Payment verification failed for ${order.id}: ${JSON.stringify(verification.data?.status)}`
+                `Amount mismatch for ${order.id}: expected ${orderAmount}, got ${verifiedAmount}`
             );
             return { success: false };
         }
 
-        // 3. Verify amount matches
-        if (verification.data.amount < order.totalAmount.toNumber()) {
-            this.logger.warn(
-                `Amount mismatch for ${order.id}: expected ${order.totalAmount}, got ${verification.data.amount}`
-            );
-            return { success: false };
-        }
-
-        // 4. Update order as paid
         await this.prisma.order.update({
             where: { id: order.id },
             data: {
@@ -445,25 +422,47 @@ export class OrdersService {
             },
         });
 
-        this.logger.log(`✅ Payment confirmed for order: ${order.id} | ₦${amount}`);
-
         return { success: true, orderId: order.id };
     }
 
-    // ============================================
-    // PRIVATE METHODS
-    // ============================================
-
-    private generateSecureOrderId(): string {
-        const bytes = randomBytes(6);
-        const hex = bytes.toString('hex').toUpperCase();
-        return `SELA-${hex.substring(0, 4)}-${hex.substring(4, 8)}-${hex.substring(8, 12)}`;
+    async logPaymentAttempt(data: {
+        txRef?: string;
+        transactionId?: string;
+        status: string;
+        amount?: number;
+        currency?: string;
+        rawBody: any;
+        ip?: string;
+        userAgent?: string;
+    }) {
+        try {
+            await this.prisma.paymentAttempt.create({
+                data: {
+                    txRef: data.txRef,
+                    transactionId: data.transactionId,
+                    status: data.status,
+                    amount: data.amount,
+                    currency: data.currency,
+                    rawBody: data.rawBody as any,
+                    ip: data.ip,
+                    userAgent: data.userAgent,
+                },
+            });
+        } catch (e) {
+            this.logger.error('Failed to log payment attempt');
+        }
     }
 
-    /**
-     * Generate WhatsApp link with order details
-     * The message is crafted server-side - user cannot modify it
-     */
+    private generateSecureOrderId(): string {
+        const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        const bytes = randomBytes(16);
+        let id = '';
+        for (let i = 0; i < 5; i++) {
+            id += charset[bytes[i] % charset.length];
+        }
+        return `SAF-${id}`;
+    }
+
     public generateWhatsAppLink(order: any): string {
         const sellerPhone = this.config.get('WHATSAPP_PHONE') || '2348032958708';
         const frontendUrl = this.config.get('FRONTEND_URL') || 'https://selebrityaboki.com';

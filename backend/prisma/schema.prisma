@@ -340,6 +340,26 @@ model AuditLog {
 }
 
 // ============================================
+// PAYMENT ATTEMPTS - Audit every transaction hit
+// ============================================
+
+model PaymentAttempt {
+  id            String   @id @default(cuid())
+  orderId       String?
+  txRef         String?
+  transactionId String?
+  status        String
+  amount        Decimal?
+  currency      String?
+  rawBody       Json
+  ip            String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+
+  @@map("payment_attempts")
+}
+
+// ============================================
 // RATE LIMIT TRACKING - Per-user limits
 // ============================================
 

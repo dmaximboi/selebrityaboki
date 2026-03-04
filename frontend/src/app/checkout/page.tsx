@@ -92,7 +92,8 @@ export default function CheckoutPage() {
                 customerEmail: formData.email,
                 customerPhone: formData.phone,
                 deliveryAddress: formData.address,
-                notes: formData.notes
+                notes: formData.notes,
+                referralCode: referralCode || undefined
             });
 
             if (orderRes.success) {

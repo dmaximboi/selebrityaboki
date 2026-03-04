@@ -16,7 +16,7 @@ export default function AiAdvisorPage() {
         {
             role: 'ai',
             content:
-                "Hello! I'm the SelebrityAboki Fruit Health Advisor. I can help you with:\n\n- Which fruits are best for your health condition\n- Nutritional benefits of specific fruits\n- Fruit recommendations for weight loss, immunity, diabetes, etc.\n- What's fresh and available at SelebrityAboki Fruit\n\nPlease note: I only answer questions about fruits and nutrition. Ask me anything!",
+                "Hello! I'm Nova, your SelebrityAboki Fruit Health Advisor. I can help you with:\n\n- Which fruits are best for your health condition\n- Nutritional benefits of specific fruits\n- Fruit recommendations for weight loss, immunity, diabetes, and more\n- What is fresh and available at SelebrityAboki Fruit\n\nI only answer questions about fruits and nutrition. Ask me anything!",
         },
     ]);
     const [input, setInput] = useState('');
@@ -37,7 +37,7 @@ export default function AiAdvisorPage() {
             return;
         }
 
-        const userMessage = input.trim();
+        const userMessage = input.trim().slice(0, 1000);
         setInput('');
         setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
         setLoading(true);
@@ -49,7 +49,7 @@ export default function AiAdvisorPage() {
             let errorMsg: string;
             switch (error.status) {
                 case 429:
-                    errorMsg = "You've sent too many messages. Please wait a moment and try again.";
+                    errorMsg = "You have sent too many messages. Please wait a moment and try again.";
                     break;
                 case 401:
                     errorMsg = "Your session has expired. Please sign in again to continue chatting.";
@@ -58,7 +58,7 @@ export default function AiAdvisorPage() {
                     errorMsg = error.message || "I can only answer questions about fruits and nutrition. Could you rephrase your question?";
                     break;
                 default:
-                    errorMsg = "I specialize in fruits and nutrition advice for SelebrityAboki Fruit. Please ask me about fruits, health benefits, or what to eat for your condition — I'm here to help!";
+                    errorMsg = "I specialize in fruits and nutrition advice for SelebrityAboki Fruit. Please ask me about fruits, health benefits, or what to eat for your condition.";
             }
             setMessages((prev) => [
                 ...prev,
@@ -82,15 +82,14 @@ export default function AiAdvisorPage() {
                 <section className="section">
                     <div className="container">
                         <div className="chat-container">
-                            <span className="hero-tag">AI-Powered</span>
+                            <span className="hero-tag">Nova AI</span>
                             <h1 className="section-title">Health Advisor</h1>
                             <hr className="divider" />
                             <p className="section-subtitle" style={{ marginBottom: 24 }}>
-                                Ask our AI about fruits, nutrition, and health benefits.
+                                Ask Nova about fruits, nutrition, and health benefits.
                                 Get personalized recommendations from SelebrityAboki Fruit.
                             </p>
 
-                            {/* Health condition input */}
                             <div className="form-group" style={{ marginBottom: 16 }}>
                                 <label className="form-label">Health condition (optional)</label>
                                 <input
@@ -98,20 +97,18 @@ export default function AiAdvisorPage() {
                                     className="form-input"
                                     placeholder="e.g., diabetes, high blood pressure, pregnancy..."
                                     value={condition}
-                                    onChange={(e) => setCondition(e.target.value)}
+                                    onChange={(e) => setCondition(e.target.value.slice(0, 100))}
                                     style={{ fontSize: '0.88rem' }}
+                                    maxLength={100}
                                 />
                             </div>
 
-                            {/* Suggestions */}
                             {messages.length <= 1 && (
                                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
                                     {suggestions.map((s) => (
                                         <button
                                             key={s}
-                                            onClick={() => {
-                                                setInput(s);
-                                            }}
+                                            onClick={() => setInput(s)}
                                             className="btn btn-ghost btn-sm"
                                             style={{
                                                 border: '1px solid var(--color-border)',
@@ -125,7 +122,6 @@ export default function AiAdvisorPage() {
                                 </div>
                             )}
 
-                            {/* Messages */}
                             <div className="chat-messages" style={{
                                 background: 'var(--color-bg-alt)',
                                 borderRadius: 'var(--radius-lg)',
@@ -138,7 +134,7 @@ export default function AiAdvisorPage() {
                                         className={`chat-message ${msg.role === 'user' ? 'chat-message-user' : ''}`}
                                     >
                                         <div className={`chat-avatar ${msg.role === 'ai' ? 'chat-avatar-ai' : 'chat-avatar-user'}`}>
-                                            {msg.role === 'ai' ? 'SF' : '?'}
+                                            {msg.role === 'ai' ? 'N' : 'U'}
                                         </div>
                                         <div className={`chat-bubble ${msg.role === 'ai' ? 'chat-bubble-ai' : 'chat-bubble-user'}`}>
                                             {msg.content}
@@ -148,11 +144,11 @@ export default function AiAdvisorPage() {
 
                                 {loading && (
                                     <div className="chat-message">
-                                        <div className="chat-avatar chat-avatar-ai">SF</div>
+                                        <div className="chat-avatar chat-avatar-ai">N</div>
                                         <div className="chat-bubble chat-bubble-ai">
-                                            <div style={{ display: 'flex', gap: 6 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                                 <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
-                                                <span style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>Thinking...</span>
+                                                <span style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>Nova is thinking...</span>
                                             </div>
                                         </div>
                                     </div>
@@ -160,16 +156,16 @@ export default function AiAdvisorPage() {
                                 <div ref={messagesEndRef} />
                             </div>
 
-                            {/* Input */}
                             <div className="chat-input-area">
                                 <input
                                     type="text"
                                     className="chat-input"
-                                    placeholder={isAuthenticated ? 'Ask about fruits, nutrition, or health benefits...' : 'Sign in to chat with the advisor'}
+                                    placeholder={isAuthenticated ? 'Ask about fruits, nutrition, or health benefits...' : 'Sign in to chat with Nova'}
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
                                     disabled={loading}
+                                    maxLength={1000}
                                 />
                                 <button
                                     onClick={sendMessage}
@@ -181,7 +177,7 @@ export default function AiAdvisorPage() {
                             </div>
 
                             <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: 8, textAlign: 'center' }}>
-                                The AI advisor provides general guidance. Always consult healthcare professionals for medical advice.
+                                Nova provides general guidance only. Always consult a healthcare professional for medical advice.
                             </p>
                         </div>
                     </div>

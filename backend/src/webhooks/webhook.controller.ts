@@ -1,10 +1,3 @@
-/**
- * Payment Webhook Controller
- * 
- * Handles Flutterwave webhooks with hash verification.
- * NEVER trust the frontend payment response - only trust webhooks.
- */
-
 import {
     Controller,
     Post,
@@ -22,7 +15,7 @@ import { OrdersService } from '../orders/orders.service';
 import { Public } from '../common/decorators/public.decorator';
 
 @Controller('webhooks')
-@Public() // Webhooks don't use JWT - they use hash verification
+@Public()
 export class WebhookController {
     private readonly logger = new Logger(WebhookController.name);
 
@@ -31,10 +24,6 @@ export class WebhookController {
         private readonly configService: ConfigService
     ) { }
 
-    /**
-     * Flutterwave webhook handler
-     * Verifies using the secret hash configured in Flutterwave dashboard
-     */
     @Post('flutterwave')
     @HttpCode(HttpStatus.OK)
     async handleFlutterwaveWebhook(
@@ -42,33 +31,35 @@ export class WebhookController {
         @Body() body: any,
         @Req() req: Request
     ) {
-        // 1. VERIFY HASH
         const secretHash = this.configService.get('FLW_WEBHOOK_HASH');
 
-        if (!verifHash || verifHash !== secretHash) {
-            this.logger.warn(
-                `Invalid Flutterwave webhook hash from IP: ${req.ip}`
-            );
-            throw new UnauthorizedException('Invalid webhook hash');
+        if (!verifHash || !secretHash || verifHash !== secretHash) {
+            this.logger.warn(`Rejected webhook from ${req.ip}`);
+            throw new UnauthorizedException('Invalid webhook signature');
         }
 
-        // 2. PROCESS EVENT
         const event = body.event;
         const data = body.data;
 
-        this.logger.log(`Flutterwave webhook: ${event} | tx_ref: ${data?.tx_ref}`);
+        await this.ordersService.logPaymentAttempt({
+            txRef: data?.tx_ref,
+            transactionId: data?.id ? String(data.id) : undefined,
+            status: data?.status || event,
+            amount: data?.amount,
+            currency: data?.currency,
+            rawBody: body,
+            ip: req.ip,
+            userAgent: req.headers['user-agent'] as string,
+        });
 
         switch (event) {
             case 'charge.completed':
                 if (data.status === 'successful') {
-                    // Verify the transaction server-side before confirming
                     await this.ordersService.verifyAndConfirmPayment(
                         data.tx_ref,
-                        data.id, // Flutterwave transaction ID
+                        data.id,
                         data.amount,
                     );
-                } else {
-                    this.logger.warn(`Payment not successful: ${data.tx_ref} - status: ${data.status}`);
                 }
                 break;
 
@@ -77,9 +68,9 @@ export class WebhookController {
                 break;
 
             default:
-                this.logger.log(`Unhandled webhook event: ${event}`);
+                this.logger.log(`Unhandled webhook event type received`);
         }
 
-        return { status: 'success' };
+        return { status: 'ok' };
     }
 }

@@ -1,9 +1,3 @@
-/**
- * Orders Controller
- * 
- * All order endpoints are protected
- */
-
 import {
     Controller,
     Get,
@@ -21,7 +15,8 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../common/guards/admin.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
-import { Role, OrderStatus } from '@prisma/client';
+import { PaymentOwnerGuard } from '../common/guards/payment-verify.guard';
+import { OrderStatus } from '@prisma/client';
 import { AuthService } from '../auth/auth.service';
 import {
     IsString,
@@ -30,19 +25,23 @@ import {
     IsOptional,
     ValidateNested,
     Min,
+    Max,
     MaxLength,
     IsEmail,
-    IsPhoneNumber,
     IsEnum,
+    Matches,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class OrderItemDto {
     @IsString()
+    @MaxLength(100)
+    @Matches(/^[a-zA-Z0-9_-]+$/, { message: 'Invalid product ID format' })
     productId: string;
 
     @IsNumber()
     @Min(1)
+    @Max(100)
     quantity: number;
 }
 
@@ -60,6 +59,7 @@ class CreateOrderDto {
     customerEmail: string;
 
     @IsString()
+    @MaxLength(20)
     customerPhone: string;
 
     @IsString()
@@ -70,6 +70,11 @@ class CreateOrderDto {
     @IsOptional()
     @MaxLength(500)
     notes?: string;
+
+    @IsString()
+    @IsOptional()
+    @MaxLength(20)
+    referralCode?: string;
 }
 
 class UpdateStatusDto {
@@ -85,11 +90,6 @@ export class OrdersController {
         private readonly authService: AuthService
     ) { }
 
-    /**
-     * Create a new order
-     * Frontend sends ONLY product IDs and quantities
-     * Prices are calculated server-side
-     */
     @Post()
     @HttpCode(HttpStatus.CREATED)
     async createOrder(
@@ -99,18 +99,11 @@ export class OrdersController {
         return this.ordersService.createOrder(userId, dto);
     }
 
-    /**
-     * Get current user's orders
-     */
     @Get('my-orders')
     async getMyOrders(@CurrentUser('id') userId: string) {
         return this.ordersService.getUserOrders(userId);
     }
 
-    /**
-     * Get order by ID (public for receipt viewing)
-     * PII is redacted for unauthenticated users
-     */
     @Public()
     @Get(':id')
     async getOrder(@Param('id') id: string, @CurrentUser() user: any) {
@@ -118,7 +111,6 @@ export class OrdersController {
 
         if (!order) return null;
 
-        // Check if full details should be shown (Admin or Owner)
         const isOwner = user && order.userId === user.sub;
         const isAdmin = user && this.authService.isAdmin(user);
 
@@ -126,43 +118,33 @@ export class OrdersController {
             return order;
         }
 
-        // Redact PII for public/unauthorized view
         return {
             id: order.id,
             total: order.totalAmount,
             status: order.status,
+            paymentStatus: order.paymentStatus,
             createdAt: order.createdAt,
             items: order.items.map((item: any) => ({
                 id: item.id,
                 name: item.productName || item.product?.name,
                 price: item.priceAtTime,
                 quantity: item.quantity,
+                imageUrl: item.product?.imageUrl,
+                unit: item.product?.unit,
             })),
+            deliveryFee: order.deliveryFee,
+            discountAmount: order.discountAmount,
             isRedacted: true,
         };
     }
 
-    /**
-     * Initialize payment for an order via Flutterwave
-     * Returns a payment link to redirect the user
-     */
     @Post(':id/pay')
+    @UseGuards(PaymentOwnerGuard)
     @HttpCode(HttpStatus.OK)
-    async initializePayment(
-        @Param('id') id: string,
-        @CurrentUser('id') userId: string
-    ) {
-        // Verify user owns this order
-        const order = await this.ordersService.getOrder(id);
-        if (order.userId !== userId) {
-            throw new BadRequestException('You can only pay for your own orders');
-        }
+    async initializePayment(@Param('id') id: string) {
         return this.ordersService.initializePayment(id);
     }
 
-    /**
-     * Update order status (admin only)
-     */
     @Patch(':id/status')
     @UseGuards(AdminGuard)
     async updateStatus(

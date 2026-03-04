@@ -12,14 +12,13 @@ function ReceiptContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const orderId = searchParams.get('orderId');
-    const status = searchParams.get('status') || searchParams.get('tx_ref'); // Handle different param names
+    const status = searchParams.get('status') || searchParams.get('tx_ref');
     const { clearCart } = useCartStore();
 
     const [order, setOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Clear cart once we reach receipt successfully
         if (status === 'successful' || !status) {
             clearCart();
         }
@@ -38,8 +37,8 @@ function ReceiptContent() {
         try {
             const data = await ordersApi.getById(orderId!);
             setOrder(data);
-        } catch (e) {
-            console.error('Failed to load order', e);
+        } catch {
+            // silent fail — order not found
         } finally {
             setLoading(false);
         }
@@ -60,9 +59,10 @@ function ReceiptContent() {
 
     const isSuccess = order.paymentStatus === 'SUCCESS' || order.paymentStatus === 'PAID';
     const isCancelled = status === 'cancelled' || order.paymentStatus === 'FAILED' || order.status === 'CANCELLED';
-    const isPending = !isSuccess && !isCancelled;
 
-    const dateStr = order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Processing...';
+    const dateStr = order.createdAt
+        ? new Date(order.createdAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' })
+        : 'Processing...';
 
     return (
         <div style={{ minHeight: '100vh', background: 'var(--color-bg-alt)', display: 'flex', flexDirection: 'column' }}>
@@ -77,11 +77,9 @@ function ReceiptContent() {
                     border: '1px solid var(--color-border)',
                     position: 'relative'
                 }}>
-                    {/* Status Ribbon for Mobile */}
                     <div style={{
                         position: 'absolute',
-                        top: 20,
-                        right: -30,
+                        top: 20, right: -30,
                         transform: 'rotate(45deg)',
                         background: isSuccess ? 'var(--color-success)' : isCancelled ? 'var(--color-error)' : 'var(--color-warning)',
                         color: 'white',
@@ -94,7 +92,6 @@ function ReceiptContent() {
                         {isSuccess ? 'PAID' : isCancelled ? 'CANCELLED' : 'PENDING'}
                     </div>
 
-                    {/* Header Banner */}
                     <div style={{
                         background: isSuccess ? 'var(--color-primary)' : isCancelled ? 'var(--color-error)' : 'var(--color-accent)',
                         padding: '60px 40px',
@@ -106,11 +103,10 @@ function ReceiptContent() {
                             width: 80, height: 80, background: 'rgba(255,255,255,0.2)',
                             borderRadius: '50%', display: 'flex', alignItems: 'center',
                             justifyContent: 'center', margin: '0 auto 24px',
-                            boxShadow: '0 0 0 8px rgba(255,255,255,0.1)'
+                            boxShadow: '0 0 0 8px rgba(255,255,255,0.1)',
+                            fontSize: '2rem', fontWeight: 800, color: 'white'
                         }}>
-                            <span style={{ fontSize: '2.5rem' }}>
-                                {isSuccess ? '✅' : isCancelled ? '❌' : '📦'}
-                            </span>
+                            {isSuccess ? 'OK' : isCancelled ? 'X' : '...'}
                         </div>
                         <h1 style={{ fontSize: '2.2rem', marginBottom: 8, color: 'white', letterSpacing: '-0.02em' }}>
                             {isSuccess ? 'Payment Successful!' : isCancelled ? 'Payment Cancelled' : 'Order Received'}
@@ -157,7 +153,7 @@ function ReceiptContent() {
                                                 <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Quantity: {item.quantity} {item.product?.unit || 'piece'}</div>
                                             </div>
                                         </div>
-                                        <span style={{ fontWeight: 700, color: 'var(--color-text)' }}>₦{(Number(item.priceAtTime) * item.quantity).toLocaleString()}</span>
+                                        <span style={{ fontWeight: 700, color: 'var(--color-text)' }}>N{(Number(item.priceAtTime) * item.quantity).toLocaleString()}</span>
                                     </div>
                                 ))}
                             </div>
@@ -169,17 +165,17 @@ function ReceiptContent() {
                         }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', color: 'var(--color-text-light)' }}>
                                 <span>Subtotal</span>
-                                <span>₦{Number(order.totalAmount - (order.deliveryFee || 0) + (order.discountAmount || 0)).toLocaleString()}</span>
+                                <span>N{Number(order.totalAmount - (order.deliveryFee || 0) + (order.discountAmount || 0)).toLocaleString()}</span>
                             </div>
                             {Number(order.discountAmount) > 0 && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', color: 'var(--color-success)', fontWeight: 500 }}>
                                     <span>Discount Applied</span>
-                                    <span>-₦{Number(order.discountAmount).toLocaleString()}</span>
+                                    <span>-N{Number(order.discountAmount).toLocaleString()}</span>
                                 </div>
                             )}
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', color: 'var(--color-text-light)' }}>
                                 <span>Delivery Fee</span>
-                                <span>₦{Number(order.deliveryFee || 0).toLocaleString()}</span>
+                                <span>N{Number(order.deliveryFee || 0).toLocaleString()}</span>
                             </div>
                             <div style={{
                                 display: 'flex', justifyContent: 'space-between', fontSize: '1.8rem',
@@ -188,7 +184,7 @@ function ReceiptContent() {
                                 letterSpacing: '-0.01em'
                             }}>
                                 <span>Total</span>
-                                <span style={{ color: 'var(--color-accent)' }}>₦{Number(order.totalAmount).toLocaleString()}</span>
+                                <span style={{ color: 'var(--color-accent)' }}>N{Number(order.totalAmount).toLocaleString()}</span>
                             </div>
                         </div>
 
@@ -217,7 +213,7 @@ function ReceiptContent() {
                                 </Link>
                             )}
                             <button onClick={() => window.print()} className="btn btn-outline btn-lg" style={{ height: 56 }}>
-                                🖨️ Print Receipt
+                                Print Receipt
                             </button>
                         </div>
                     </div>
@@ -234,8 +230,6 @@ function ReceiptContent() {
                 @media (max-width: 600px) {
                     .receipt-body { padding: 30px 20px !important; }
                     h1 { font-size: 1.6rem !important; }
-                    .display-grid { grid-template-columns: 1fr !important; gap: 24px !important; }
-                    div[style*="textAlign: right"] { textAlign: left !important; }
                 }
             `}</style>
         </div>

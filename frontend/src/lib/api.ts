@@ -142,6 +142,7 @@ export const ordersApi = {
         customerPhone: string;
         deliveryAddress: string;
         notes?: string;
+        referralCode?: string;
     }) => request<any>('/orders', { method: 'POST', body: JSON.stringify(data) }),
 
     getMyOrders: () => request<any[]>('/orders/my-orders'),
@@ -202,6 +203,15 @@ export const referralsApi = {
         request<{ valid: boolean; referrerName?: string }>(`/referrals/validate/${code}`),
 };
 
+export const notificationsApi = {
+    getVapidPublicKey: () => request<{ publicKey: string }>('/notifications/vapid-public-key'),
+    subscribe: (subscription: any) =>
+        request<any>('/notifications/subscribe', {
+            method: 'POST',
+            body: JSON.stringify(subscription),
+        }),
+};
+
 // ============================================
 // PROMOTIONS API
 // ============================================
@@ -237,6 +247,7 @@ export const adminApi = {
     getAiStats: () => request<any>('/admin/ai-stats'),
     getAiAnalytics: () => request<any>('/admin/ai-analytics'),
     getLoginAnalytics: () => request<any>('/admin/login-analytics'),
+    getPaymentAttempts: () => request<any[]>('/admin/payment-attempts'),
     generateContent: (type: string) =>
         request<any>(`/content/generate/${type}`, { method: 'POST' }),
 

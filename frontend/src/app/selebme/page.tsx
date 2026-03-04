@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { adminApi, productsApi, authApi } from '@/lib/api';
 
-type Tab = 'dashboard' | 'analytics' | 'ai' | 'logins' | 'orders' | 'products' | 'contacts' | 'users' | 'content' | 'activity' | 'ramadan';
+type Tab = 'dashboard' | 'analytics' | 'ai' | 'logins' | 'orders' | 'products' | 'contacts' | 'users' | 'content' | 'activity' | 'ramadan' | 'audit';
 
 interface ProductFormData {
     name: string; slug: string; description: string; price: number;
@@ -46,9 +46,12 @@ function AdminContent() {
     const [loginData, setLoginData] = useState<any>(null);
     const [orders, setOrders] = useState<any>(null);
     const [orderStatus, setOrderStatus] = useState('');
+    const [paymentStatus, setPaymentStatus] = useState('');
+    const [orderSearch, setOrderSearch] = useState('');
     const [contacts, setContacts] = useState<any[]>([]);
     const [users, setUsers] = useState<any[]>([]);
     const [activity, setActivity] = useState<any[]>([]);
+    const [paymentAttempts, setPaymentAttempts] = useState<any[]>([]);
     const [flashSales, setFlashSales] = useState<any[]>([]);
     const [promotions, setPromotions] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
@@ -96,7 +99,11 @@ function AdminContent() {
                     setLoginData(await adminApi.getLoginAnalytics());
                     break;
                 case 'orders':
-                    setOrders(await adminApi.getOrders(orderStatus ? { status: orderStatus } : undefined));
+                    setOrders(await adminApi.getOrders({
+                        status: orderStatus || undefined,
+                        paymentStatus: paymentStatus || undefined,
+                        search: orderSearch || undefined
+                    }));
                     break;
                 case 'contacts':
                     setContacts(await adminApi.getContacts());
@@ -106,6 +113,9 @@ function AdminContent() {
                     break;
                 case 'activity':
                     setActivity(await adminApi.getActivity());
+                    break;
+                case 'audit':
+                    setPaymentAttempts(await adminApi.getPaymentAttempts());
                     break;
                 case 'ramadan': {
                     const [fs, pr, prods] = await Promise.all([adminApi.getFlashSales(), adminApi.getPromotions(), productsApi.getAll()]);
@@ -122,7 +132,7 @@ function AdminContent() {
             console.error('Failed to load tab data', e);
         }
         setLoading(false);
-    }, [orderStatus]);
+    }, [orderStatus, paymentStatus, orderSearch]);
 
     useEffect(() => {
         if (isAdmin) loadTabData(activeTab);
@@ -255,17 +265,18 @@ function AdminContent() {
     );
 
     const tabs: { key: Tab; label: string; icon: string }[] = [
-        { key: 'dashboard', label: 'Dashboard', icon: '📊' },
-        { key: 'analytics', label: 'Analytics', icon: '📈' },
-        { key: 'ai', label: 'AI Usage', icon: '🤖' },
-        { key: 'logins', label: 'Sign-ins', icon: '🔐' },
-        { key: 'orders', label: 'Orders', icon: '📦' },
-        { key: 'products', label: 'Products', icon: '🍎' },
-        { key: 'ramadan', label: '🌙 Ramadan', icon: '' },
-        { key: 'contacts', label: 'Messages', icon: '✉️' },
-        { key: 'users', label: 'Users', icon: '👥' },
-        { key: 'content', label: 'Content', icon: '✍️' },
-        { key: 'activity', label: 'Audit Log', icon: '🗂️' },
+        { key: 'dashboard', label: 'Dashboard', icon: 'DB' },
+        { key: 'analytics', label: 'Analytics', icon: 'AN' },
+        { key: 'ai', label: 'AI Usage', icon: 'AI' },
+        { key: 'logins', label: 'Sign-ins', icon: 'LG' },
+        { key: 'orders', label: 'Orders', icon: 'OR' },
+        { key: 'products', label: 'Products', icon: 'PR' },
+        { key: 'ramadan', label: 'Ramadan', icon: 'RM' },
+        { key: 'contacts', label: 'Messages', icon: 'MSG' },
+        { key: 'users', label: 'Users', icon: 'US' },
+        { key: 'content', label: 'Content', icon: 'CT' },
+        { key: 'audit', label: 'Pay Audit', icon: 'PA' },
+        { key: 'activity', label: 'Audit Log', icon: 'AL' },
     ];
 
     const statStyle = {
@@ -290,14 +301,14 @@ function AdminContent() {
                                 className={`admin-nav-item ${activeTab === tab.key ? 'active' : ''}`}
                                 style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10 }}
                             >
-                                <span style={{ fontSize: '1.2rem' }}>{tab.icon}</span>
+                                <span style={{ fontSize: '0.72rem', fontWeight: 700, fontFamily: 'monospace', opacity: 0.7, minWidth: 24, textAlign: 'center' }}>{tab.icon}</span>
                                 <span>{tab.label}</span>
                             </button>
                         </li>
                     ))}
                     <li style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                         <a href="/" className="admin-nav-item" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <span>🏠</span> <span>Back to Site</span>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 700, fontFamily: 'monospace', opacity: 0.7, minWidth: 24, textAlign: 'center' }}>HM</span> <span>Back to Site</span>
                         </a>
                     </li>
                 </ul>
@@ -427,9 +438,9 @@ function AdminContent() {
                                 <div style={statStyle}>
                                     <h3 style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: 12 }}>Quick Actions</h3>
                                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                        <button onClick={() => setActiveTab('orders')} className="btn btn-outline btn-sm">
-                                            📦 {dashData.orders?.pending || 0} Pending Orders
-                                        </button>
+                                        <button onClick={() => setActiveTab('users')} className={`admin-tab ${activeTab === 'users' ? 'active' : ''}`}>👥 Users</button>
+                                        <button onClick={() => setActiveTab('audit')} className={`admin-tab ${activeTab === 'audit' ? 'active' : ''}`}>🛡️ Audit</button>
+                                        <button onClick={() => setActiveTab('activity')} className={`admin-tab ${activeTab === 'activity' ? 'active' : ''}`}>🕐 Activity</button>
                                         <button onClick={() => setActiveTab('contacts')} className="btn btn-outline btn-sm">
                                             ✉️ {dashData.contacts?.unread || 0} Unread Messages
                                         </button>
@@ -637,96 +648,157 @@ function AdminContent() {
                         {/* ===== ORDERS ===== */}
                         {activeTab === 'orders' && (
                             <>
-                                {/* Filter */}
-                                <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-                                    {['', 'PENDING', 'CONFIRMED', 'PROCESSING', 'DELIVERED', 'CANCELLED'].map((s) => (
-                                        <button
-                                            key={s}
-                                            onClick={() => { setOrderStatus(s); loadTabData('orders'); }}
-                                            className={`btn btn-sm ${orderStatus === s ? 'btn-primary' : 'btn-ghost'}`}
-                                        >
-                                            {s || 'All'}
-                                        </button>
-                                    ))}
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 24, alignItems: 'center', background: 'white', padding: 20, borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
+                                    <div style={{ flex: 1, minWidth: 250 }}>
+                                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 6, textTransform: 'uppercase' }}>Search Orders</div>
+                                        <input
+                                            type="text"
+                                            placeholder="Order ID, Name or Phone..."
+                                            className="form-input"
+                                            style={{ width: '100%' }}
+                                            onKeyDown={(e) => { if (e.key === 'Enter') setOrderSearch((e.target as HTMLInputElement).value); }}
+                                            defaultValue={orderSearch}
+                                        />
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 6, textTransform: 'uppercase' }}>Order Status</div>
+                                        <div style={{ display: 'flex', gap: 8 }}>
+                                            {['', 'PENDING', 'CONFIRMED', 'DELIVERED', 'CANCELLED'].map(s => (
+                                                <button
+                                                    key={s}
+                                                    onClick={() => setOrderStatus(s)}
+                                                    className={`btn btn-xs ${orderStatus === s ? 'btn-primary' : 'btn-ghost'}`}
+                                                    style={{ height: 32, padding: '0 12px' }}
+                                                >
+                                                    {s || 'All'}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 6, textTransform: 'uppercase' }}>Payment</div>
+                                        <div style={{ display: 'flex', gap: 8 }}>
+                                            {['', 'SUCCESS', 'PENDING', 'FAILED'].map(s => (
+                                                <button
+                                                    key={s}
+                                                    onClick={() => setPaymentStatus(s)}
+                                                    className={`btn btn-xs ${paymentStatus === s ? 'btn-accent' : 'btn-ghost'}`}
+                                                    style={{ height: 32, padding: '0 12px' }}
+                                                >
+                                                    {s || 'All'}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
+
                                 {orders && (
                                     <>
-                                        <table className="data-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Order ID</th>
-                                                    <th>Customer</th>
-                                                    <th>Items</th>
-                                                    <th>Total</th>
-                                                    <th>Contact</th>
-                                                    <th>Payment</th>
-                                                    <th>Status</th>
-                                                    <th>Date</th>
-                                                    <th>Verification & Action</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {orders.orders?.map((order: any) => (
-                                                    <tr key={order.id}>
-                                                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem' }}>{order.orderId}</td>
-                                                        <td>
-                                                            <div style={{ fontWeight: 500 }}>{order.customerName}</div>
-                                                            <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>{order.customerEmail}</div>
-                                                        </td>
-                                                        <td>{order.items?.length || 0}</td>
-                                                        <td style={{ fontWeight: 600 }}>{fmt(order.totalAmount)}</td>
-                                                        <td>
-                                                            {order.whatsappUrl ? (
-                                                                <a href={order.whatsappUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-xs" style={{ color: '#25D366', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
-                                                                    <span style={{ fontSize: '1.2rem' }}>💬</span> WhatsApp
-                                                                </a>
-                                                            ) : '—'}
-                                                        </td>
-                                                        <td>
-                                                            <span className={`status-badge ${order.paymentStatus === 'SUCCESS' ? 'status-delivered' : order.paymentStatus === 'PENDING' ? 'status-pending' : 'status-cancelled'}`}>
-                                                                {order.paymentStatus === 'SUCCESS' ? '✅ PAID' : order.paymentStatus}
-                                                            </span>
-                                                        </td>
-                                                        <td>
-                                                            <span className={`status-badge status-${order.status?.toLowerCase()}`}>
-                                                                {order.status}
-                                                            </span>
-                                                        </td>
-                                                        <td style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
-                                                            {order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-NG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
-                                                        </td>
-                                                        <td>
-                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                                                <select
-                                                                    value={order.status}
-                                                                    onChange={(e) => handleOrderStatus(order.id, e.target.value)}
-                                                                    style={{ padding: '6px 8px', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', width: '100%' }}
-                                                                >
-                                                                    {['PENDING', 'CONFIRMED', 'PROCESSING', 'DELIVERED', 'CANCELLED'].map(s => (
-                                                                        <option key={s} value={s}>{s === 'DELIVERED' ? 'Complete / Delivered' : s}</option>
-                                                                    ))}
-                                                                </select>
-                                                                {order.status === 'PENDING' && order.paymentStatus === 'SUCCESS' && (
-                                                                    <button
-                                                                        onClick={() => handleOrderStatus(order.id, 'CONFIRMED')}
-                                                                        className="btn btn-primary btn-xs"
-                                                                        style={{ fontSize: '0.7rem', padding: '2px 4px' }}
-                                                                    >
-                                                                        Confirm Order
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        </td>
+                                        <div className="card" style={{ padding: 0, overflow: 'hidden', border: 'none', boxShadow: 'var(--shadow-md)' }}>
+                                            <table className="data-table" style={{ margin: 0 }}>
+                                                <thead style={{ background: '#f8fafc' }}>
+                                                    <tr>
+                                                        <th>Order Info</th>
+                                                        <th>Customer</th>
+                                                        <th>Total</th>
+                                                        <th>Payment Status</th>
+                                                        <th>Delivery Status</th>
+                                                        <th>Verification</th>
+                                                        <th>Actions</th>
                                                     </tr>
-                                                ))}
-                                                {!orders.orders?.length && (
-                                                    <tr><td colSpan={8} style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-muted)' }}>No orders</td></tr>
-                                                )}
-                                            </tbody>
-                                        </table>
-                                        {orders.pagination && (
-                                            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 16, fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-                                                Page {orders.pagination.page} of {orders.pagination.totalPages} ({orders.pagination.total} orders)
+                                                </thead>
+                                                <tbody>
+                                                    {orders.orders?.map((order: any) => {
+                                                        const isPaid = order.paymentStatus === 'SUCCESS';
+                                                        return (
+                                                            <tr key={order.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                                <td>
+                                                                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text)' }}>{order.id}</div>
+                                                                    <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: 2 }}>
+                                                                        {new Date(order.createdAt).toLocaleDateString('en-NG', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                                    </div>
+                                                                </td>
+                                                                <td>
+                                                                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{order.customerName}</div>
+                                                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{order.customerPhone}</div>
+                                                                </td>
+                                                                <td>
+                                                                    <div style={{ fontWeight: 800, color: 'var(--color-primary-dark)' }}>{fmt(order.totalAmount)}</div>
+                                                                    <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)' }}>{order.items?.length || 0} items</div>
+                                                                </td>
+                                                                <td>
+                                                                    <span className={`status-badge ${isPaid ? 'status-delivered' : order.paymentStatus === 'FAILED' ? 'status-cancelled' : 'status-pending'}`} style={{ padding: '4px 10px', fontSize: '0.7rem' }}>
+                                                                        {isPaid ? '✅ SUCCESS' : order.paymentStatus}
+                                                                    </span>
+                                                                </td>
+                                                                <td>
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                                        <select
+                                                                            value={order.status}
+                                                                            onChange={(e) => handleOrderStatus(order.id, e.target.value)}
+                                                                            className={`status-badge status-${order.status?.toLowerCase()}`}
+                                                                            style={{ border: 'none', cursor: 'pointer', appearance: 'none', textAlign: 'center' }}
+                                                                        >
+                                                                            {['PENDING', 'CONFIRMED', 'PROCESSING', 'DELIVERED', 'CANCELLED'].map(s => (
+                                                                                <option key={s} value={s}>{s}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                    </div>
+                                                                </td>
+                                                                <td>
+                                                                    {order.whatsappUrl && (
+                                                                        <a href={order.whatsappUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-xs" style={{ color: '#25D366', fontWeight: 700 }}>
+                                                                            Verify on WhatsApp
+                                                                        </a>
+                                                                    )}
+                                                                    <Link href={`/receipt?orderId=${order.id}`} target="_blank" className="btn btn-ghost btn-xs" style={{ color: 'var(--color-primary)' }}>
+                                                                        📋 View Full Receipt
+                                                                    </Link>
+                                                                </td>
+                                                                <td>
+                                                                    <div style={{ display: 'flex', gap: 6 }}>
+                                                                        {order.status === 'PENDING' && isPaid && (
+                                                                            <button
+                                                                                onClick={() => handleOrderStatus(order.id, 'CONFIRMED')}
+                                                                                className="btn btn-primary btn-xs"
+                                                                            >
+                                                                                Confirm
+                                                                            </button>
+                                                                        )}
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                if (confirm('Are you sure you want to cancel this order?'))
+                                                                                    handleOrderStatus(order.id, 'CANCELLED');
+                                                                            }}
+                                                                            className="btn btn-outline btn-xs"
+                                                                            style={{ color: 'var(--color-error)', borderColor: 'var(--color-error)' }}
+                                                                        >
+                                                                            Cancel
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                            {!orders.orders?.length && (
+                                                <div style={{ textAlign: 'center', padding: '60px 40px', background: 'white' }}>
+                                                    <div style={{ fontSize: '3rem', marginBottom: 16 }}>🔍</div>
+                                                    <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--color-text)' }}>No matching orders found</h3>
+                                                    <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginTop: 4 }}>Try adjusting your filters or search query.</p>
+                                                    <button onClick={() => { setOrderStatus(''); setPaymentStatus(''); setOrderSearch(''); }} className="btn btn-ghost btn-sm" style={{ marginTop: 20 }}>Clear All Filters</button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {orders.pagination && orders.pagination.totalPages > 1 && (
+                                            <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 32, alignItems: 'center' }}>
+                                                <button disabled={orders.pagination.page <= 1} className="btn btn-ghost btn-sm">Prev</button>
+                                                <span style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+                                                    Page {orders.pagination.page} of {orders.pagination.totalPages}
+                                                </span>
+                                                <button disabled={orders.pagination.page >= orders.pagination.totalPages} className="btn btn-ghost btn-sm">Next</button>
                                             </div>
                                         )}
                                     </>
@@ -1051,6 +1123,61 @@ function AdminContent() {
                                         </tbody>
                                     </table>
                                 </div>
+                            </div>
+                        )}
+                        {/* ===== PAYMENT AUDIT ===== */}
+                        {activeTab === 'audit' && paymentAttempts && (
+                            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                                <div style={{ padding: 20, borderBottom: '1px solid var(--color-border)', background: '#fff' }}>
+                                    <h2 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>🛡️ Webhook Payment Audit</h2>
+                                    <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>Real-time logs of every hit to our payment webhook. Use this to verify transactions manually if needed.</p>
+                                </div>
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Timestamp</th>
+                                            <th>Ref / ID</th>
+                                            <th>Status</th>
+                                            <th>Amount</th>
+                                            <th>IP / User Agent</th>
+                                            <th>Raw Data</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {paymentAttempts.map((att: any) => (
+                                            <tr key={att.id}>
+                                                <td style={{ fontSize: '0.82rem' }}>
+                                                    {new Date(att.createdAt).toLocaleString('en-NG')}
+                                                </td>
+                                                <td>
+                                                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', fontWeight: 600 }}>{att.txRef || '—'}</div>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{att.transactionId || '—'}</div>
+                                                </td>
+                                                <td>
+                                                    <span className={`status-badge ${att.status === 'successful' || att.status === 'SUCCESS' ? 'status-delivered' : 'status-pending'}`}>
+                                                        {att.status}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <strong style={{ color: 'var(--color-primary-dark)' }}>{att.amount ? `₦${Number(att.amount).toLocaleString()}` : '—'}</strong>
+                                                    <div style={{ fontSize: '0.7rem' }}>{att.currency}</div>
+                                                </td>
+                                                <td>
+                                                    <div style={{ fontSize: '0.78rem' }}>{att.ip}</div>
+                                                    <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={att.userAgent}>
+                                                        {att.userAgent}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <button onClick={() => alert(JSON.stringify(att.rawBody, null, 2))} className="btn btn-ghost btn-xs">View JSON</button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {paymentAttempts.length === 0 && (
+                                            <tr><td colSpan={6} style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-muted)' }}>No payment attempts logged yet.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
                             </div>
                         )}
                     </>

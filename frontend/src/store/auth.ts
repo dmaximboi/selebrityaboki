@@ -1,9 +1,3 @@
-/**
- * Auth Store (Zustand)
- * 
- * Manages authentication state across the app
- */
-
 import { create } from 'zustand';
 import { authApi, setAccessToken, getAccessToken } from '../lib/api';
 
@@ -60,14 +54,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         try {
             await authApi.logout();
         } catch {
-            // Continue logout even if API fails
+            // noop
         }
         setAccessToken(null);
         set({ user: null, isAuthenticated: false, isAdmin: false });
     },
 
     checkAuth: async () => {
-        // Don't overwrite if login() already authenticated the user
         if (get().isAuthenticated) {
             set({ isLoading: false });
             return;
@@ -75,7 +68,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
         set({ isLoading: true });
 
-        // 1) First try: use saved access token from localStorage
         const savedToken = getAccessToken();
         if (savedToken) {
             try {
@@ -88,15 +80,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 });
                 return;
             } catch {
-                // Token expired — clear it and try cookie refresh below
                 setAccessToken(null);
             }
         }
 
-        // 2) Fallback: try cookie-based refresh (works on same domain)
         try {
-            // Use relative URL in production so the request goes through
-            // the Vercel rewrite proxy (same-origin, avoids CORS)
             const apiBase =
                 typeof window !== 'undefined' && process.env.NODE_ENV === 'production'
                     ? '/api'

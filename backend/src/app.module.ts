@@ -1,21 +1,13 @@
-/**
- * SelebrityAboki Fruit - Main App Module
- * 
- * Configures all feature modules and global security
- */
-
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 
-// Core modules
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
-// Feature modules
 import { UsersModule } from './users/users.module';
 import { ProductsModule } from './products/products.module';
 import { OrdersModule } from './orders/orders.module';
@@ -29,57 +21,40 @@ import { ReferralsModule } from './referrals/referrals.module';
 import { PromotionsModule } from './promotions/promotions.module';
 import { NotificationsModule } from './notifications/notifications.module';
 
-// Security
 import { SecurityInterceptor } from './common/interceptors/security.interceptor';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
+import { SanitizeMiddleware } from './common/middleware/sanitize.middleware';
 
 @Module({
     imports: [
-        // ============================================
-        // CONFIGURATION
-        // ============================================
         ConfigModule.forRoot({
             isGlobal: true,
-            envFilePath: process.env.NODE_ENV === 'production' ? '.env' : '.env',
+            envFilePath: '.env',
         }),
 
-        // ============================================
-        // SECURITY LAYER 6: Rate Limiting
-        // 100 requests per minute per IP
-        // ============================================
         ThrottlerModule.forRoot([
             {
                 name: 'short',
-                ttl: 1000, // 1 second
-                limit: 10, // 10 req/sec
+                ttl: 1000,
+                limit: 10,
             },
             {
                 name: 'medium',
-                ttl: 60000, // 1 minute
-                limit: 100, // 100 req/min
+                ttl: 60000,
+                limit: 100,
             },
             {
                 name: 'long',
-                ttl: 3600000, // 1 hour
-                limit: 1000, // 1000 req/hour
+                ttl: 3600000,
+                limit: 1000,
             },
         ]),
 
-        // ============================================
-        // SCHEDULED TASKS (AI Content Generation)
-        // ============================================
         ScheduleModule.forRoot(),
 
-        // ============================================
-        // CORE MODULES
-        // ============================================
         PrismaModule,
         AuthModule,
         HealthModule,
-
-        // ============================================
-        // FEATURE MODULES
-        // ============================================
         UsersModule,
         ProductsModule,
         OrdersModule,
@@ -93,9 +68,6 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
         NotificationsModule,
     ],
     providers: [
-        // ============================================
-        // GLOBAL GUARDS
-        // ============================================
         {
             provide: APP_GUARD,
             useClass: JwtAuthGuard,
@@ -104,10 +76,6 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
             provide: APP_GUARD,
             useClass: ThrottlerGuard,
         },
-
-        // ============================================
-        // GLOBAL INTERCEPTORS
-        // ============================================
         {
             provide: APP_INTERCEPTOR,
             useClass: SecurityInterceptor,
@@ -118,4 +86,14 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
         },
     ],
 })
-export class AppModule { }
+export class AppModule {
+    configure(consumer: MiddlewareConsumer) {
+        consumer
+            .apply(SanitizeMiddleware)
+            .exclude(
+                { path: 'api/webhooks/flutterwave', method: RequestMethod.POST },
+                { path: 'health', method: RequestMethod.GET },
+            )
+            .forRoutes({ path: 'api/*', method: RequestMethod.ALL });
+    }
+}

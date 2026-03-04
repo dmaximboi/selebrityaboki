@@ -1,14 +1,3 @@
-/**
- * SelebrityAboki Fruit Backend - Main Entry Point (Express)
- *
- * Security Layers:
- * 1. Helmet  - HTTP Security Headers
- * 2. CORS    - Only trusted origins
- * 3. Cookies - HTTP-only, Secure, SameSite via cookie-parser
- * 4. Validation Pipe - Input sanitization
- * 5. Body Size Limit - 10MB
- */
-
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
@@ -18,15 +7,13 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
     const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-        logger: ['error', 'warn', 'log'],
+        logger: process.env.NODE_ENV === 'production' ? ['error', 'warn'] : ['error', 'warn', 'log'],
+        rawBody: true,
     });
 
-    // Trust Render/Vercel proxy
     app.set('trust proxy', 1);
+    app.set('x-powered-by', false);
 
-    // ============================================
-    // SECURITY LAYER 1: Helmet (HTTP Headers)
-    // ============================================
     app.use(
         helmet({
             contentSecurityPolicy: {
@@ -34,8 +21,14 @@ async function bootstrap() {
                     defaultSrc: ["'self'"],
                     styleSrc: ["'self'", "'unsafe-inline'", 'fonts.googleapis.com'],
                     fontSrc: ["'self'", 'fonts.gstatic.com'],
-                    imgSrc: ["'self'", 'data:', 'https:', 'res.cloudinary.com'],
+                    imgSrc: ["'self'", 'data:', 'https:', 'res.cloudinary.com', 'i.ibb.co'],
                     scriptSrc: ["'self'"],
+                    connectSrc: ["'self'", 'https://api.flutterwave.com'],
+                    frameSrc: ["'none'"],
+                    objectSrc: ["'none'"],
+                    baseUri: ["'self'"],
+                    formAction: ["'self'"],
+                    upgradeInsecureRequests: [],
                 },
             },
             crossOriginEmbedderPolicy: false,
@@ -44,12 +37,13 @@ async function bootstrap() {
                 includeSubDomains: true,
                 preload: true,
             },
+            referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+            dnsPrefetchControl: { allow: false },
+            permittedCrossDomainPolicies: { permittedPolicies: 'none' },
+            hidePoweredBy: true,
         })
     );
 
-    // ============================================
-    // SECURITY LAYER 2: CORS Whitelist
-    // ============================================
     const allowedOrigins = [
         process.env.FRONTEND_URL,
         'https://selebrityaboki.com',
@@ -62,10 +56,7 @@ async function bootstrap() {
             if (process.env.NODE_ENV !== 'production') {
                 return callback(null, true);
             }
-            if (!origin) {
-                return callback(null, true);
-            }
-            if (allowedOrigins.includes(origin)) {
+            if (!origin || allowedOrigins.includes(origin)) {
                 return callback(null, true);
             }
             callback(new Error('CORS not allowed'));
@@ -73,49 +64,33 @@ async function bootstrap() {
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+        maxAge: 86400,
     });
 
-    // ============================================
-    // SECURITY LAYER 3: Cookie Parser
-    // ============================================
-    app.use(cookieParser(process.env.JWT_SECRET));
+    app.use(cookieParser(process.env.COOKIE_SECRET || process.env.JWT_SECRET));
 
-    // ============================================
-    // SECURITY LAYER 4: Global Validation Pipe
-    // ============================================
     app.useGlobalPipes(
         new ValidationPipe({
             whitelist: true,
             forbidNonWhitelisted: true,
             transform: true,
-            transformOptions: {
-                enableImplicitConversion: true,
-            },
+            transformOptions: { enableImplicitConversion: true },
             disableErrorMessages: process.env.NODE_ENV === 'production',
+            stopAtFirstError: true,
         })
     );
 
-    // Global prefix — health excluded
     const { DecimalInterceptor } = await import('./common/interceptors/decimal.interceptor');
     app.useGlobalInterceptors(new DecimalInterceptor());
 
-    app.setGlobalPrefix('api', {
-        exclude: ['health'],
-    });
+    app.setGlobalPrefix('api', { exclude: ['health'] });
 
     const port = process.env.PORT || 4000;
     await app.listen(port, '0.0.0.0');
 
-    console.log(`
-  =============================================
-  SelebrityAboki Fruit API is running!
-  
-  Environment: ${process.env.NODE_ENV || 'development'}
-  Port: ${port}
-  Health: http://localhost:${port}/health
-  API: http://localhost:${port}/api
-  =============================================
-  `);
+    if (process.env.NODE_ENV !== 'production') {
+        console.log(`API running on port ${port}`);
+    }
 }
 
 bootstrap();

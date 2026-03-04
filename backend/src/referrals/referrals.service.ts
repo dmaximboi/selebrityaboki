@@ -1,9 +1,4 @@
-/**
- * Referrals Service
- * 
- * Handles referral code generation, tracking, and reward eligibility.
- * All discount calculations are server-side — frontend never controls amounts.
- */
+
 
 import {
     Injectable,

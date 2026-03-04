@@ -1,11 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-
-const API_URL =
-    typeof window !== 'undefined' && process.env.NODE_ENV === 'production'
-        ? '/api'
-        : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api');
+import { notificationsApi } from '@/lib/api';
 
 function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -21,9 +17,7 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
 async function subscribeUserToPush(registration: ServiceWorkerRegistration) {
     try {
         // Fetch VAPID public key from backend
-        const res = await fetch(`${API_URL}/notifications/vapid-public-key`);
-        if (!res.ok) return;
-        const { publicKey } = await res.json();
+        const { publicKey } = await notificationsApi.getVapidPublicKey();
         if (!publicKey) return;
 
         const subscription = await registration.pushManager.subscribe({
@@ -32,12 +26,7 @@ async function subscribeUserToPush(registration: ServiceWorkerRegistration) {
         });
 
         // Send subscription to backend
-        await fetch(`${API_URL}/notifications/subscribe`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(subscription),
-        });
+        await notificationsApi.subscribe(subscription);
 
         console.log('[PWA] Push subscription registered');
     } catch (err) {

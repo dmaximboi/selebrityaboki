@@ -225,9 +225,32 @@ export class AdminService {
     /**
      * Get all orders with pagination and filters
      */
-    async getAllOrders(page = 1, limit = 20, status?: string) {
+    async getAllOrders(options?: {
+        page?: number;
+        limit?: number;
+        status?: string;
+        paymentStatus?: string;
+        search?: string;
+    }) {
+        const page = options?.page || 1;
+        const limit = options?.limit || 20;
         const skip = (page - 1) * limit;
-        const where = status ? { status: status as any } : {};
+
+        const where: any = {};
+        if (options?.status) {
+            where.status = options.status;
+        }
+        if (options?.paymentStatus) {
+            where.paymentStatus = options.paymentStatus;
+        }
+        if (options?.search) {
+            where.OR = [
+                { id: { contains: options.search, mode: 'insensitive' } },
+                { customerName: { contains: options.search, mode: 'insensitive' } },
+                { customerEmail: { contains: options.search, mode: 'insensitive' } },
+                { customerPhone: { contains: options.search, mode: 'insensitive' } },
+            ];
+        }
 
         const [orders, total] = await Promise.all([
             this.prisma.order.findMany({
@@ -248,14 +271,11 @@ export class AdminService {
         ]);
 
         return {
-            orders: orders.map(o => ({
-                ...o,
-                whatsappUrl: this.ordersService.generateWhatsAppLink(o)
-            })),
+            orders,
             pagination: {
+                total,
                 page,
                 limit,
-                total,
                 totalPages: Math.ceil(total / limit),
             },
         };
@@ -297,5 +317,15 @@ export class AdminService {
         ]);
 
         return { totalChats, todayChats };
+    }
+
+    /**
+     * Get payment webhook audit logs
+     */
+    async getPaymentAttempts() {
+        return this.prisma.paymentAttempt.findMany({
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+        });
     }
 }

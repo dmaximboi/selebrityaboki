@@ -22,13 +22,17 @@ export class AdminController {
     async getOrders(
         @Query('page') page?: string,
         @Query('limit') limit?: string,
-        @Query('status') status?: string
+        @Query('status') status?: string,
+        @Query('paymentStatus') paymentStatus?: string,
+        @Query('search') search?: string
     ) {
-        return this.adminService.getAllOrders(
-            page ? parseInt(page) : 1,
-            limit ? parseInt(limit) : 20,
-            status
-        );
+        return this.adminService.getAllOrders({
+            page: page ? parseInt(page) : 1,
+            limit: limit ? parseInt(limit) : 20,
+            status,
+            paymentStatus,
+            search,
+        });
     }
 
     @Get('activity')
@@ -56,5 +60,11 @@ export class AdminController {
     @Get('login-analytics')
     async getLoginAnalytics() {
         return this.adminService.getLoginAnalytics();
+    }
+
+    /** Payment webhook audit trail */
+    @Get('payment-attempts')
+    async getPaymentAttempts() {
+        return this.adminService.getPaymentAttempts();
     }
 }
